@@ -5,6 +5,7 @@ import shap
 import pandas as pd
 import numpy as np
 from scipy.stats import percentileofscore
+import matplotlib
 import matplotlib.pyplot as plt
 import json
 
@@ -27,9 +28,9 @@ PICKLE_DIR = ROOT / "pickle"
 DATA_DIR = ROOT / "data"
 
 PICKLE_FILES = {
-    "gbm_model": "gbm_model_.pkl",
-    "mlb": "mlb_.pkl",
-    "feature_names": "feature_names_.pkl",
+    "gbm_model": "gbm_model._pkl",
+    "mlb": "mlb._pkl",
+    "feature_names": "feature_names._pkl",
 }
 
 
@@ -57,7 +58,32 @@ def clean_col(name) -> str:
     return re.sub(r"[^A-Za-z0-9_]+", "_", str(name))
 
 
-skill_to_col = {s: clean_col(s) for s in mlb.classes_}
+def _dedup_names(raw_cols, seen) -> list:
+    # Dedup giong logic luc train trong salary_predictor.py:
+    # gap ten da thay thi them _1, _2, ...
+    seen = list(seen)
+    out = []
+    for raw in raw_cols:
+        base = clean_col(raw)
+        if base in seen or base in out:
+            i = 1
+            while f"{base}_{i}" in seen or f"{base}_{i}" in out:
+                i += 1
+            base = f"{base}_{i}"
+        out.append(base)
+    return out
+
+
+# NOTE: "C#" va "C++" deu clean thanh "C_" -> train doi ten thanh "C_" va "C__1".
+# Dung dict naive {s: clean_col(s)} se tao 2 cot "C_" giong nhau
+# -> reindex bao "cannot reindex on an axis with duplicate labels".
+_seen_cols: list = []
+skill_to_col = {}
+for _s in mlb.classes_:
+    _c = _dedup_names([_s], _seen_cols)[0]
+    _seen_cols.append(_c)
+    skill_to_col[_s] = _c
+_SKILL_COLS = list(_seen_cols)
 col_to_skill = {v: k for k, v in skill_to_col.items()}
 
 
@@ -72,22 +98,21 @@ def encode_cv(cv_dict: dict) -> pd.DataFrame:
     skill_list = [str(s).strip() for s in raw if str(s).strip()]
 
     skill_arr = mlb.transform([skill_list])
-    skill_df = pd.DataFrame(
-        skill_arr, columns=[skill_to_col[s] for s in mlb.classes_]
-    )
+    skill_df = pd.DataFrame(skill_arr, columns=_SKILL_COLS)
 
     cat_df = pd.get_dummies(pd.DataFrame([{
         "job_title": cv_dict.get("job_title"),
         "level": cv_dict.get("level"),
         "location": cv_dict.get("location"),
     }]))
-    cat_df.columns = [clean_col(c) for c in cat_df.columns]
+    cat_df.columns = _dedup_names(list(cat_df.columns), _SKILL_COLS)
 
     num_df = pd.DataFrame([{"years_experience": cv_dict.get("years_experience", 0)}])
 
     X_one = pd.concat([skill_df, cat_df, num_df], axis=1)
+    # Phong khi concat van trung (vd cat trung skill): giu cot dau, bo cot lap
+    X_one = X_one.loc[:, ~X_one.columns.duplicated()]
     return X_one.reindex(columns=feature_names, fill_value=0)
-
 
 _explainer = None
 _base_value = None
@@ -134,14 +159,14 @@ def get_market_context(n_sample: int = 1000):
     )
     s_df = pd.DataFrame(
         mlb.transform(df["skill_list"]),
-        columns=[skill_to_col[s] for s in mlb.classes_],
+        columns=_SKILL_COLS,
     )
     cat_all = pd.get_dummies(df[["job_title", "level", "location"]])
-    cat_all.columns = [clean_col(c) for c in cat_all.columns]
+    cat_all.columns = _dedup_names(list(cat_all.columns), _SKILL_COLS)
     num_all = df[["years_experience"]]
-    X_all = pd.concat([s_df, cat_all, num_all], axis=1).reindex(
-        columns=feature_names, fill_value=0
-    )
+    X_all = pd.concat([s_df, cat_all, num_all], axis=1)
+    X_all = X_all.loc[:, ~X_all.columns.duplicated()]
+    X_all = X_all.reindex(columns=feature_names, fill_value=0)
 
     X_sample = X_all.sample(min(n_sample, len(X_all)), random_state=42)
     shap_sample = _shap_2d(get_explainer(), X_sample)
