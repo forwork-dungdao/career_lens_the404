@@ -201,7 +201,19 @@ def main():
                 up = st.file_uploader("Chọn file CV", type=["pdf", "docx"], label_visibility="collapsed")
         
         def cv_reader(file):
-            pass    # Placeholder for CV reading logic
+            import tempfile
+            from core.cv_reader import CVParserPipeline
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf" if file.name.endswith(".pdf") else ".docx") as tmp:
+                tmp.write(file.getvalue())
+                PDF_PATH = tmp.name
+            try:
+                pipeline = CVParserPipeline()
+                df_cv = pipeline.run(PDF_PATH)
+            finally:
+                if os.path.exists(PDF_PATH):
+                    os.remove(PDF_PATH)
+            if df_cv.empty: return None
+            return df_cv.iloc[0].to_dict()
 
         cv_ready = False
         if up is not None:
@@ -210,8 +222,11 @@ def main():
                 for p in range(0, 101, 20):
                     bar.progress(p)
                     time.sleep(0.15)
-                text = cv_reader(up)
+                cv_data = cv_reader(up)
+                st.session_state["cv_data"] = cv_data
+                st.session_state["cv_done"] = True
                 s.update(label="Trích xuất hoàn tất.", state="complete")
+            cv_ready = True
         elif st.session_state.get("cv_done"):
             cv_ready = True
     
@@ -231,7 +246,81 @@ def main():
                     unsafe_allow_html=True,
                 )
             else:
-                pass
+                cv_data = st.session_state.get("cv_data")
+                if cv_data:
+                    import joblib
+                    import re
+                    
+                    try:
+                        model_dir = os.path.join(os.path.dirname(__file__), "models")
+                        mlb = joblib.load(os.path.join(model_dir, "mlb.pkl"))
+                        gbm_model = joblib.load(os.path.join(model_dir, "gbm_model.pkl"))
+                        feature_names = joblib.load(os.path.join(model_dir, "feature_names.pkl"))
+                        
+                        # Khởi tạo DataFrame toàn số 0 theo đúng chuẩn
+                        X_input = pd.DataFrame(0, index=[0], columns=feature_names)
+                        
+                        # 1. Điền thông tin kỹ năng
+                        skills = cv_data.get("skill", [])
+                        if skills:
+                            skills_encoded = mlb.transform([skills])[0]
+                            for idx, class_name in enumerate(mlb.classes_):
+                                if skills_encoded[idx] == 1:
+                                    col1 = class_name
+                                    col2 = class_name.replace(" ", "_").replace(".", "_")
+                                    col3 = re.sub(r"\W+", "_", class_name.strip())
+                                    
+                                    if col1 in X_input.columns:
+                                        X_input.at[0, col1] = 1
+                                    elif col2 in X_input.columns:
+                                        X_input.at[0, col2] = 1
+                                    elif col3 in X_input.columns:
+                                        X_input.at[0, col3] = 1
+                        
+                        # 2. Điền số năm kinh nghiệm
+                        years = float(cv_data.get("năm kinh nghiệm", 0.0))
+                        if "years_experience" in X_input.columns:
+                            X_input.at[0, "years_experience"] = years
+                            
+                        # 3. Điền cấp độ (Level)
+                        level = cv_data.get("level công việc", "")
+                        if level == "Mid-Level" and "level_Middle" in X_input.columns:
+                            X_input.at[0, "level_Middle"] = 1
+                        elif level == "Junior" and "level_Junior" in X_input.columns:
+                            X_input.at[0, "level_Junior"] = 1
+                        elif level == "Senior" and "level_Senior" in X_input.columns:
+                            X_input.at[0, "level_Senior"] = 1
+                            
+                        # Dự đoán
+                        pred_salary = gbm_model.predict(X_input)[0]
+                        
+                        st.markdown("### Kết quả Phân tích CV & Dự đoán Lương")
+                        st.markdown(
+                            f'''
+                            <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 16px; padding: 24px; color: white; text-align: center; margin-bottom: 20px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                                <h4 style="color: #94a3b8; margin: 0 0 12px 0; font-weight: 500;">MỨC LƯƠNG ĐỀ XUẤT (VNĐ)</h4>
+                                <h1 style="color: #10b981; margin: 0; font-size: 48px; font-weight: 700;">{pred_salary:,.1f} Triệu</h1>
+                                <p style="color: #cbd5e1; margin: 12px 0 0 0;">Dựa trên phân tích bằng Machine Learning</p>
+                            </div>
+                            ''', 
+                            unsafe_allow_html=True
+                        )
+                        
+                        col_e, col_l = st.columns(2)
+                        with col_e:
+                            st.metric(label="Kinh nghiệm", value=f"{years} năm")
+                        with col_l:
+                            st.metric(label="Cấp độ", value=level)
+                            
+                        st.markdown("**Kỹ năng phát hiện được:**")
+                        if skills:
+                            skills_html = "".join([f'<span style="display:inline-block; background:#e2e8f0; color:#0f172a; padding:4px 12px; border-radius:16px; margin:4px; font-size:14px; font-weight:500;">{s}</span>' for s in skills])
+                            st.markdown(f"<div>{skills_html}</div>", unsafe_allow_html=True)
+                        else:
+                            st.info("Không tìm thấy kỹ năng IT cụ thể.")
+                            
+                    except Exception as e:
+                        st.error(f"Lỗi khi dự đoán: {e}")
 
 
     if selected == "Dashboard":
