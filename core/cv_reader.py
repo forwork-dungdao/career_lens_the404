@@ -3,7 +3,7 @@ import glob
 import re
 import unicodedata
 from datetime import datetime
-from typing import List, Tuple, Dict, Any,Set
+from typing import List, Tuple, Dict, Any, Set, Optional
 import concurrent.futures
 import fitz  
 import pandas as pd
