@@ -118,12 +118,12 @@ class CVDataIngestor:
                 total_chars += len(page_text.strip())
 
             if len(doc) > 0 and (total_chars / len(doc)) < 50:
-                print(f"⚠️️ CẢNH BÁO: '{base_name}' có mật độ chữ cực thấp. Khả năng cao là PDF ảnh (Scanned PDF).")
+                print(f" CẢNH BÁO: '{base_name}' có mật độ chữ cực thấp. Khả năng cao là PDF ảnh (Scanned PDF).")
 
             if not full_text.strip(): return []
             return self._detect_and_split_records(full_text, base_name)
         except Exception as e:
-            print(f"⚠ lỗi đọc pdf {file_path}: {e}")
+            print(f"lỗi đọc pdf {file_path}: {e}")
             return []
         finally:
             if doc: doc.close()
@@ -135,7 +135,7 @@ class CVDataIngestor:
             if not full_text.strip(): return []
             return self._detect_and_split_records(full_text, os.path.basename(file_path))
         except Exception as e:
-            print(f"⚠️ lỗi đọc docx {file_path}: {e}")
+            print(f"lỗi đọc docx {file_path}: {e}")
             return []
 
     # CSV cũng được quét qua bộ cắt CV (nếu 1 ô Excel chứa nhiều CV gộp)
@@ -143,7 +143,7 @@ class CVDataIngestor:
         try:
             df = pd.read_csv(csv_path)
         except Exception as e:
-            print(f"⚠️️ lỗi đọc csv {csv_path}: {e}")
+            print(f"lỗi đọc csv {csv_path}: {e}")
             return []
         col = self.text_col
         if not col or col not in df.columns:
@@ -408,13 +408,13 @@ class CVParserPipeline:
         """
         Chạy pipeline và trả thẳng (return) về Pandas DataFrame cho Tầng 2.
         """
-        print(f"⏳ Đang nạp dữ liệu từ: {input_path}...")
+        print(f" Đang nạp dữ liệu từ: {input_path}...")
         raw_cvs = self.ingestor.run(input_path)
         if not raw_cvs:
-            print("❌ Không tìm thấy CV nào hợp lệ!")
+            print("Không tìm thấy CV nào hợp lệ!")
             return pd.DataFrame() # Trả về DataFrame rỗng nếu lỗi
 
-        print(f"✅ Đã nạp {len(raw_cvs)} CV. Ép xung đa luồng (Multiprocessing)...")
+        print(f"Đã nạp {len(raw_cvs)} CV. Ép xung đa luồng (Multiprocessing)...")
         final_results = []
 
         with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -423,7 +423,7 @@ class CVParserPipeline:
                 try:
                     final_results.append(future.result())
                 except Exception as e:
-                    print(f"❌ Lỗi khi xử lý CV: {e}")
+                    print(f"Lỗi khi xử lý CV: {e}")
 
                 if i % 100 == 0 or i == len(raw_cvs):
                     print(f"  -> Đã bóc tách {i}/{len(raw_cvs)} CV...")
@@ -431,5 +431,5 @@ class CVParserPipeline:
         # GHÉP 3 CỘT VÀO LÀM 1: Tạo DataFrame hoàn chỉnh
         df_final = pd.DataFrame(final_results)
         
-        print(f"🚀 XONG ! Đã return DataFrame với shape: {df_final.shape}")
+        print(f" XONG ! Đã return DataFrame với shape: {df_final.shape}")
         return df_final
