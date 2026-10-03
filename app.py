@@ -119,7 +119,7 @@ def main():
                     color='Số lượng',
                     height=500
                 )
-                st.plotly_chart(fig_bar, use_container_width=True)
+                st.plotly_chart(fig_bar, width='stretch')
                 
                 # Hiển thị bảng
                 with st.expander("Hiển thị dữ liệu bảng"):
@@ -145,7 +145,7 @@ def main():
                     height=250
                 )
                 fig_donut.update_layout(margin=dict(t=10, b=10, l=10, r=10))
-                st.plotly_chart(fig_donut, use_container_width=True)
+                st.plotly_chart(fig_donut, width='stretch')
                 
                 with st.expander("Dữ liệu bảng"):
                     interactive_table(df_donut, classes="display compact", maxBytes=0)
@@ -176,7 +176,7 @@ def main():
                     height=250
                 )
                 fig_heat.update_layout(margin=dict(t=10, b=10, l=10, r=10))
-                st.plotly_chart(fig_heat, use_container_width=True)
+                st.plotly_chart(fig_heat, width='stretch')
                 
                 with st.expander("Dữ liệu bảng"):
                     interactive_table(heatmap_data.reset_index(), classes="display compact", maxBytes=0)
@@ -185,9 +185,9 @@ def main():
 
     def salary_predictor():
         st.title("📄 Salary Predictor")
-        left2, right2 = st.columns([7, 5])
+        result, upload = st.columns([7, 5])
         
-        with right2:
+        with upload:
             with st.container(border=True):
                 st.subheader("Tải CV của bạn")
                 st.caption("Định dạng: .pdf, .docx - Giới hạn: 10 MB - Kéo thả hoặc bấm chọn")
@@ -208,7 +208,7 @@ def main():
         elif st.session_state.get("cv_done"):
             cv_ready = True
     
-        with left2:
+        with result:
             if not cv_ready and not st.session_state.get("cv_done"):
                 # before cv upload
                 st.markdown(
@@ -234,4 +234,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
