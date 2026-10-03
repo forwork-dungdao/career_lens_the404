@@ -9,6 +9,7 @@ venv/
 .idea/
 *.swp
 *.swo
+*.pkl
 *~
 .DS_Store
 Thumbs.db
