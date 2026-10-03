@@ -128,18 +128,4 @@ Các script trong `core/` là công cụ xử lý riêng; chạy ứng dụng b�
 - Giao diện Salary Predictor gọi `core/cv_reader.py` và sau đó nạp artifacts `mlb.pkl`, `gbm_model.pkl`, `feature_names.pkl` từ `models/`.
 - Parser trả về các trường như `skills`, `years`, `level`, trong khi phần dự đoán trong `app.py` hiện đọc `skill`, `năm kinh nghiệm`, `level công việc`. Cần đồng bộ các tên trường để thông tin CV được đưa đầy đủ vào mô hình.
 - `core/salary_predictor.py` đọc dữ liệu và bắt đầu huấn luyện ngay khi module được import. Chỉ chạy quy trình này khi dữ liệu đầu vào đã sẵn sàng và bạn chủ động muốn huấn luyện.
-- Repository có artifacts cũ trong `pickle/` với hậu tố `._pkl`; ứng dụng hiện tìm các file `.pkl` theo tên chuẩn trong `models/`.
-
-## Khắc phục sự cố
-
-### Không đọc được dữ liệu
-
-Đảm bảo file nằm tại `data/job.csv`, là CSV hợp lệ và có các cột mà Dashboard sử dụng: `job_title`, `level`, `location`, `avg_salary`.
-
-### Không tìm thấy model hoặc encoder
-
-Kiểm tra các file `mlb.pkl`, `gbm_model.pkl` và `feature_names.pkl` có trong `models/` hay không. Có thể chạy `core/salary_predictor.py` để huấn luyện mô hình và tạo artifacts; quy trình này cần dữ liệu đầu vào phù hợp.
-
-## Phát triển
-
-Đóng góp nên giữ các thay đổi giao diện trong `app.py`/`assets/`, các xử lý dữ liệu trong `core/`, và cập nhật tài liệu này khi thay đổi cách cài đặt, schema dữ liệu hoặc trạng thái tính năng.
+- Repository có artifacts cũ trong `pickle/` với hậu tố `._pkl`; ứng dụng hiện tìm các file `.pkl` theo tên chuẩn trong `models/'.
