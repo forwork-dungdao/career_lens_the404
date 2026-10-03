@@ -1,29 +1,57 @@
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* Tùy chỉnh CSS cho giao diện Streamlit hiện đại */
 div[data-testid="stContainer"] {
-    border-radius: 12px;
+    animation: fadeInUp 0.7s ease-out;
+    border-radius: 16px;
     padding: 1rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    border: 1px solid #e2e8f0;
-    background-color: #ffffff;
-    transition: box-shadow 0.3s ease;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--secondary-background-color);
+    background-color: var(--background-color);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+/* Hiệu ứng loading cho thanh trạng thái */
+@keyframes pulseLoading {
+    0% { opacity: 0.6; transform: scale(0.98); }
+    50% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0.6; transform: scale(0.98); }
+}
+
+div[data-testid="stStatusWidget"] {
+    animation: pulseLoading 1.5s infinite ease-in-out;
 }
 
 div[data-testid="stContainer"]:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    transform: translateY(-4px);
 }
 
 div[data-testid="stMetricValue"] {
     font-size: 2rem;
     font-weight: 700;
-    color: #0f172a;
+    color: var(--text-color);
 }
 
 /* Các tuỳ chỉnh sidebar hoặc nền nếu cần */
 .stApp {
-    background-color: #f8fafc;
+    background-color: var(--secondary-background-color);
 }
 
 h1, h2, h3 {
     font-family: 'Inter', sans-serif;
-    color: #1e293b;
+    color: var(--text-color);
+}
+
+/* Animation class cho mượt mà */
+.fade-in {
+    animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
 }
