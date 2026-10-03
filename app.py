@@ -19,7 +19,7 @@ import pygwalker as pyg
 
 # Thiết lập cấu hình trang
 st.set_page_config(
-    page_title="TechSkill Radar - Data Visualization",
+    page_title="Career Lens",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -46,8 +46,8 @@ def main():
     load_local_css()
 
     # Rút ngắn và căn giữa thanh điều hướng
-    nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
-    with nav_col2:
+    left, middle, right = st.columns([1, 2, 1])
+    with middle:
         selected = option_menu(
             menu_title=None, 
             options=["Dashboard", "Salary Predictor"],
