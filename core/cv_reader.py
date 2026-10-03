@@ -3,14 +3,15 @@ import glob
 import re
 import unicodedata
 from datetime import datetime
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any, Optional ,Set
 import concurrent.futures
-import fitz  # PyMuPDF
+import fitz  
 import pandas as pd
 import spacy
 from spacy.matcher import PhraseMatcher
 import json
 import docx
+
 class CVDataIngestor:
     def __init__(self, text_col: str = None, id_col: str = None):
         self.text_col = text_col
@@ -236,5 +237,78 @@ def extract_contact_and_labeled_fields(text: str) -> Dict[str, Any]:
                     result["name"] = line
                     break
     return result
+#Module 2 : Xây dựng Taxonomy & Khớp kỹ năng (Skill Matching Engine).
 
+def extract_skills(self, text: str) -> List[str]:
+        """
+        Trả về trực tiếp 1 list chứa toàn bộ skills 
+        để đối chiếu với model .pkl ở Tầng 2.
+        """
+        results: Set[str] = set()
+        if not text: 
+            return []
 
+        doc = self.nlp(text)
+        for match_id, start, end in self.matcher(doc):
+            canonical_name = self.nlp.vocab.strings[match_id]
+            # Nhét thẳng vào 1 set để tự động lọc trùng
+            results.add(canonical_name)
+
+        # Trả về 1 list đã sắp xếp theo thứ tự alphabet
+        return sorted(list(results))
+
+class CVParserPipeline:
+    def __init__(self):
+       # các công cụ bóc tách, bỏ phần xuất file JSON
+        self.ingestor = CVDataIngestor()
+        self.skill_extractor = SkillExtractor()
+        self.exp_extractor = ExperienceExtractor()
+        
+    def process_single_cv(self, cv_id: str, text: str) -> dict:
+        # Bóc tách để lấy raw_exp_str (nếu có)
+        contact_info = extract_contact_and_labeled_fields(text)
+        
+        # CỘT 1: Lấy List skills (Module 2.2)
+        skills_list = self.skill_extractor.extract_skills(text)
+        
+        # CỘT 2 & 3: Lấy Level và Years (Module 2.3)
+        experience = self.exp_extractor.extract_experience(text, contact_info.get("raw_experience_str"))
+        
+        # Trả về dict phẳng để chuyển thành DataFrame
+        return {
+            "candidate_id": cv_id,
+            "skills": skills_list,              # 1 List các skill
+            "level": experience.get("level"),   # Cấp độ
+            "years": experience.get("years")    # Số năm kinh nghiệm
+        }
+
+    def run(self, input_path: str) -> pd.DataFrame:
+        """
+        Chạy pipeline và trả thẳng (return) về Pandas DataFrame cho Tầng 2.
+        """
+        print(f"⏳ Đang nạp dữ liệu từ: {input_path}...")
+        raw_cvs = self.ingestor.run(input_path)
+        if not raw_cvs:
+            print("❌ Không tìm thấy CV nào hợp lệ!")
+            return pd.DataFrame() # Trả về DataFrame rỗng nếu lỗi
+
+        print(f"✅ Đã nạp {len(raw_cvs)} CV. Ép xung đa luồng (Multiprocessing)...")
+        final_results = []
+
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            futures = {executor.submit(self.process_single_cv, cv_id, text): cv_id for cv_id, text in raw_cvs}
+            for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+                try:
+                    final_results.append(future.result())
+                except Exception as e:
+                    print(f"❌ Lỗi khi xử lý CV: {e}")
+
+                if i % 100 == 0 or i == len(raw_cvs):
+                    print(f"  -> Đã bóc tách {i}/{len(raw_cvs)} CV...")
+
+        # GHÉP 3 CỘT VÀO LÀM 1: Tạo DataFrame hoàn chỉnh
+        df_final = pd.DataFrame(final_results)
+        
+        print(f"🚀 XONG ! Đã return DataFrame với shape: {df_final.shape}")
+        return df_final
+    
