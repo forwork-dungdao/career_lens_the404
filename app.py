@@ -15,7 +15,6 @@ st.set_page_config(
 def main():
     st.logo("🎯")
 
-
     def dashboard():
         st.title("📊 Dashboard")
         st.write("Placeholder")
@@ -74,10 +73,6 @@ def main():
             st.subheader("Tải CV của bạn")
             st.caption("Định dạng: .pdf, .docx - Giới hạn: 10 MB - Kéo thả hoặc bấm chọn")
             up = st.file_uploader("Chọn file CV", type=["pdf", "docx"], label_visibility="collapsed")
-            if st.button("Xóa CV - quay về Locked", use_container_width=True):
-                st.session_state.pop("cv_done", None)
-                st.session_state.pop("cv_name", None)
-                st.rerun()
         
         def cv_reader(file):
             pass    # Placeholder for CV reading logic
