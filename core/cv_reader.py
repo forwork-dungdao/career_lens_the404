@@ -256,7 +256,130 @@ def extract_skills(self, text: str) -> List[str]:
         # Trả về 1 list đã sắp xếp theo thứ tự alphabet
         return sorted(list(results))
 
+class SkillExtractor:
+    """Module 2: Khớp kỹ năng bằng NLP SpaCy và trả về 1 List duy nhất"""
+    def __init__(self):
+        self.nlp = spacy.blank("en")
+        self.matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
+        
+        # Từ điển Taxonomy chuẩn hóa kỹ năng
+        self.taxonomy = {
+            "languages": {
+                "Python": ["python", "python3", "py"], "SQL": ["sql", "t-sql", "pl/sql"],
+                "C++": ["c++", "cpp"], "Java": ["java"], "R": ["r programming"],
+                "JavaScript": ["javascript", "js"], "TypeScript": ["typescript", "ts"], "C#": ["c#", "csharp"]
+            },
+            "libraries": {
+                "Pandas": ["pandas"], "NumPy": ["numpy"], "Scikit-learn": ["scikit-learn", "sklearn"],
+                "TensorFlow": ["tensorflow", "tf"], "PyTorch": ["pytorch", "torch"], "Keras": ["keras"],
+                "Matplotlib": ["matplotlib"], "Seaborn": ["seaborn"], "React Native": ["react native"]
+            },
+            "databases": {
+                "MySQL": ["mysql"], "PostgreSQL": ["postgresql", "postgres"],
+                "SQL Server": ["sql server", "ms sql"], "MongoDB": ["mongodb", "mongo"],
+                "Redis": ["redis"], "SQLite": ["sqlite"]
+            },
+            "tools_and_concepts": {
+                "Excel": ["excel", "pivot table"], "Power BI": ["power bi"], "Tableau": ["tableau"],
+                "Machine Learning": ["machine learning", "ml", "học máy"],
+                "Deep Learning": ["deep learning", "dl"], "OOP": ["oop", "hướng đối tượng"],
+                "Git/GitHub": ["git", "github", "gitlab"], "Data Cleaning": ["data cleaning"]
+            }
+        }
+        self.canonical_to_category: Dict[str, str] = {}
+        self._build_matcher()
+
+    def _build_matcher(self):
+        for category, canonical_dict in self.taxonomy.items():
+            for canonical_name, aliases in canonical_dict.items():
+                self.canonical_to_category[canonical_name] = category
+                patterns = [self.nlp.make_doc(text) for text in aliases]
+                self.matcher.add(canonical_name, patterns)
+
+    def extract_skills(self, text: str) -> List[str]:
+        """
+        Bản cải tiến: Trả về trực tiếp 1 list chứa toàn bộ skills 
+        để đối chiếu với model .pkl ở Tầng 2.
+        """
+        results: Set[str] = set()
+        if not text: 
+            return []
+
+        doc = self.nlp(text)
+        for match_id, start, end in self.matcher(doc):
+            canonical_name = self.nlp.vocab.strings[match_id]
+            # Nhét thẳng vào set để tự động lọc trùng
+            results.add(canonical_name)
+
+        # Trả về 1 list đã sắp xếp theo thứ tự alphabet
+        return sorted(list(results))
+
+class ExperienceExtractor:
+    """Module 2.3: Khai phá số năm kinh nghiệm với thuật toán Merge Intervals"""
+    def __init__(self, current_year: int = None):
+        # Tự động lấy năm hiện tại
+        self.current_year = current_year or datetime.now().year
+        
+        self.exp_header_pattern = re.compile(
+            r'(?:^|\n)\s*(?:WORK\s+EXPERIENCE|EXPERIENCE|EMPLOYMENT|KINH\s*NGHIỆM(?:\s*LÀM\s*VIỆC)?|PROJECTS?|DỰ\s*ÁN)\b', re.IGNORECASE
+        )
+        self.next_header_pattern = re.compile(
+            r'(?:^|\n)\s*(?:EDUCATION|HỌC\s*VẤN|SKILLS?|KỸ\s*NĂNG|CERTIFICATIONS?|CHỨNG\s*CHỈ|ACTIVITIES|HOẠT\s*ĐỘNG|AWARDS)\b', re.IGNORECASE
+        )
+
+    def _extract_exp_section(self, text: str) -> str:
+        start_match = self.exp_header_pattern.search(text)
+        if not start_match: return ""
+        start_idx = start_match.end()
+        end_match = self.next_header_pattern.search(text, pos=start_idx)
+        end_idx = end_match.start() if end_match else len(text)
+        return text[start_idx:end_idx].strip()
+
+    def _classify_level(self, years: float) -> str:
+        if years < 1.0: return "Intern / Fresher"
+        elif 1.0 <= years < 3.0: return "Junior"
+        elif 3.0 <= years < 5.0: return "Mid-Level"
+        return "Senior"
+
+    def extract_experience(self, text: str, raw_exp_str: Optional[str] = None) -> Dict[str, Any]:
+        """Trả về Dictionary chứa 2 key: 'years' và 'level'"""
+        if raw_exp_str:
+            num_match = re.search(r'(\d+(?:\.\d+)?)', raw_exp_str)
+            if num_match: return {"years": float(num_match.group(1)), "level": self._classify_level(float(num_match.group(1)))}
+
+        search_target = self._extract_exp_section(text) or text
+
+        year_explicit = re.search(r'(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?|năm)', search_target, re.IGNORECASE)
+        if year_explicit: return {"years": float(year_explicit.group(1)), "level": self._classify_level(float(year_explicit.group(1)))}
+
+        # Thuật toán Merge Intervals chống gối đầu thời gian
+        date_ranges = re.findall(r'\b(20\d{2})\s*[-–—tođến]+\s*(20\d{2}|present|nay|hiện\s*tại)\b', search_target, re.IGNORECASE)
+        if date_ranges:
+            intervals = []
+            for start_str, end_str in date_ranges:
+                start_y = int(start_str)
+                end_y = self.current_year if any(k in end_str.lower() for k in ["present", "nay", "hiện"]) else int(end_str)
+                if start_y <= end_y: intervals.append([start_y, end_y])
+            
+            if intervals:
+                intervals.sort(key=lambda x: x[0])
+                merged = [intervals[0]]
+                for current in intervals[1:]:
+                    previous = merged[-1]
+                    if current[0] <= previous[1]: previous[1] = max(previous[1], current[1])
+                    else: merged.append(current)
+                
+                total_years = sum(end - start for start, end in merged)
+                return {"years": float(total_years), "level": self._classify_level(float(total_years))}
+
+        lower_text = text.lower()
+        if any(w in lower_text for w in ["intern", "fresher", "sinh viên"]): return {"years": 0.0, "level": "Intern / Fresher"}
+        if "senior" in lower_text: return {"years": 5.0, "level": "Senior"}
+        if "junior" in lower_text: return {"years": 1.0, "level": "Junior"}
+
+        return {"years": 0.0, "level": "Intern / Fresher"}
 class CVParserPipeline:
+    
     def __init__(self):
        # các công cụ bóc tách, bỏ phần xuất file JSON
         self.ingestor = CVDataIngestor()
