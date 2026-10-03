@@ -16,3 +16,4 @@ Thumbs.db
 /docs
 /.kilo
 /.superpowers/sdd
+/core/__pycache__
