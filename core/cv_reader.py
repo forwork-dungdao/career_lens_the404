@@ -187,40 +187,109 @@ class SkillExtractor:
         self.nlp = spacy.blank("en")
         self.matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
         
+        # Từ điển kỹ năng IT mở rộng
         self.taxonomy = {
+            # Ngôn ngữ lập trình
             "Python": ["python", "python3", "py"],
-            "JavaScript": ["javascript", "js", "es6", "vanilla js"],
+            "JavaScript": ["javascript", "js", "es6", "es2015", "vanilla js", "ecmascript"],
             "TypeScript": ["typescript", "ts"],
-            "Java": ["java", "core java", "j2ee", "spring boot"],
-            "C#": ["c#", "csharp", ".net", "asp.net"],
+            "Java": ["java", "core java", "j2ee", "spring boot", "spring", "spring mvc", "hibernate"],
+            "C#": ["c#", "csharp", ".net", "asp.net", ".net core", "dotnet"],
             "C++": ["c++", "cpp", "c/c++"],
-            "PHP": ["php", "laravel"],
+            "C": ["c language", "ansi c"],
+            "PHP": ["php", "laravel", "symfony", "codeigniter"],
             "Go": ["go", "golang"],
-            "Ruby": ["ruby", "ruby on rails"],
+            "Ruby": ["ruby", "ruby on rails", "rails"],
+            "Rust": ["rust", "rustlang"],
+            "Kotlin": ["kotlin"],
+            "Swift": ["swift", "swiftui"],
+            "Scala": ["scala"],
+            "R": ["r language", "r programming", "rstudio"],
+            "Matlab": ["matlab"],
+            "Shell": ["bash", "shell script", "shell", "powershell", "zsh"],
+            
+            # Data & AI/ML
             "Machine Learning": ["machine learning", "ml", "học máy"],
-            "Deep Learning": ["deep learning", "dl", "neural networks"],
+            "Deep Learning": ["deep learning", "dl", "neural networks", "neural network"],
+            "NLP": ["nlp", "natural language processing", "xử lý ngôn ngữ tự nhiên"],
+            "Computer Vision": ["computer vision", "cv", "image recognition", "object detection"],
             "Data Analysis": ["data analysis", "data analytics", "phân tích dữ liệu"],
-            "Pandas": ["pandas"], "NumPy": ["numpy"], 
+            "Data Science": ["data science", "khoa học dữ liệu"],
+            "Data Engineering": ["data engineering", "data pipeline"],
+            "Pandas": ["pandas"],
+            "NumPy": ["numpy"],
             "Scikit-learn": ["scikit-learn", "sklearn"],
-            "TensorFlow": ["tensorflow", "tf"], "PyTorch": ["pytorch"],
-            "SQL": ["sql", "mysql", "postgresql", "t-sql", "pl/sql", "sql server"],
-            "NoSQL": ["nosql", "mongodb", "cassandra", "redis", "dynamodb"],
-            "React": ["react", "reactjs", "react.js"],
+            "TensorFlow": ["tensorflow", "tf", "keras"],
+            "PyTorch": ["pytorch", "torch"],
+            "Spark": ["spark", "pyspark", "apache spark"],
+            "Hadoop": ["hadoop", "hdfs", "mapreduce"],
+            "Power BI": ["power bi", "powerbi"],
+            "Tableau": ["tableau"],
+            "ETL": ["etl", "extract transform load"],
+            "Airflow": ["airflow", "apache airflow"],
+            
+            # Database
+            "SQL": ["sql", "mysql", "postgresql", "t-sql", "pl/sql", "sql server", "mariadb"],
+            "NoSQL": ["nosql", "mongodb", "cassandra", "redis", "dynamodb", "couchdb"],
+            "Elasticsearch": ["elasticsearch", "elastic search", "elk"],
+            "Oracle": ["oracle", "oracle db"],
+            "SQLite": ["sqlite"],
+            
+            # Frontend & Mobile
+            "React": ["react", "reactjs", "react.js", "react hooks"],
             "React Native": ["react native"],
-            "Angular": ["angular", "angularjs"],
-            "Vue": ["vue", "vuejs", "vue.js"],
-            "HTML/CSS": ["html", "html5", "css", "css3", "tailwind", "bootstrap"],
+            "Angular": ["angular", "angularjs", "angular.js"],
+            "Vue": ["vue", "vuejs", "vue.js", "nuxt", "nuxtjs"],
+            "Next.js": ["next.js", "nextjs", "next"],
+            "HTML/CSS": ["html", "html5", "css", "css3"],
+            "Tailwind": ["tailwind", "tailwindcss", "tailwind css"],
+            "Bootstrap": ["bootstrap"],
+            "SASS/SCSS": ["sass", "scss"],
+            "jQuery": ["jquery"],
             "Flutter": ["flutter", "dart"],
-            "Node.js": ["node.js", "nodejs", "node"],
-            "AWS": ["aws", "amazon web services", "ec2", "s3"],
+            "Android": ["android", "android studio"],
+            "iOS": ["ios", "xcode", "objective-c"],
+            "Figma": ["figma"],
+            
+            # Backend & API
+            "Node.js": ["node.js", "nodejs", "node", "express", "expressjs"],
+            "Django": ["django", "django rest"],
+            "FastAPI": ["fastapi", "fast api"],
+            "Flask": ["flask"],
+            "RESTful API": ["restful api", "rest api", "restful", "api design"],
+            "GraphQL": ["graphql"],
+            "gRPC": ["grpc"],
+            "Microservices": ["microservices", "micro services", "microservice"],
+            
+            # Cloud & DevOps
+            "AWS": ["aws", "amazon web services", "ec2", "s3", "lambda", "sagemaker"],
             "Azure": ["azure", "microsoft azure"],
-            "GCP": ["gcp", "google cloud"],
-            "Docker": ["docker", "containerization"],
+            "GCP": ["gcp", "google cloud", "google cloud platform", "bigquery"],
+            "Docker": ["docker", "containerization", "container"],
             "Kubernetes": ["kubernetes", "k8s"],
-            "Git": ["git", "github", "gitlab", "bitbucket"],
-            "CI/CD": ["ci/cd", "jenkins", "github actions", "gitlab ci"]
+            "Git": ["git", "github", "gitlab", "bitbucket", "version control"],
+            "CI/CD": ["ci/cd", "cicd", "jenkins", "github actions", "gitlab ci", "circleci"],
+            "Terraform": ["terraform", "iac", "infrastructure as code"],
+            "Ansible": ["ansible"],
+            "Linux": ["linux", "ubuntu", "centos", "redhat"],
+            "Nginx": ["nginx"],
+            
+            # Testing & QA
+            "Unit Testing": ["unit test", "unit testing", "jest", "pytest", "mocha"],
+            "Selenium": ["selenium", "webdriver"],
+            "Cypress": ["cypress"],
+            
+            # Khác
+            "Agile": ["agile", "scrum", "kanban", "sprint"],
+            "Jira": ["jira", "atlassian"],
+            "RabbitMQ": ["rabbitmq", "message queue"],
+            "Kafka": ["kafka", "apache kafka"],
+            "WebSocket": ["websocket", "socket.io"],
+            "OAuth": ["oauth", "oauth2", "jwt", "json web token"],
+            "Blockchain": ["blockchain", "smart contract", "solidity", "web3"],
         }
         
+        # Ưu tiên load từ file .pkl nếu có
         if skills_path and Path(skills_path).exists():
             try:
                 mlb = joblib.load(skills_path)
@@ -231,12 +300,14 @@ class SkillExtractor:
             except Exception:
                 pass
         
+        # Nạp taxonomy vào spaCy PhraseMatcher
         for canonical_name, aliases in self.taxonomy.items():
             patterns = [self.nlp.make_doc(text) for text in aliases]
             self.matcher.add(canonical_name, patterns)
 
     def extract_skills(self, text: str) -> List[str]:
         if not text: return []
+        # Làm sạch dấu câu để chống dính chữ
         clean_text = re.sub(r'[,|/\\;:]', ' ', text)
         results = set()
         doc = self.nlp(clean_text)
@@ -251,16 +322,14 @@ class SkillExtractor:
 class ExperienceExtractor:
     def __init__(self):
         self.current_year = datetime.now().year
-        # Mở rộng nhận diện tiêu đề để chống bỏ sót
         self.exp_header = re.compile(r'(?:WORK\s+EXPERIENCE|EXPERIENCE|KINH\s*NGHIỆM\s*LÀM\s*VIỆC|KINH\s*NGHIỆM|LỊCH\s*SỬ\s*LÀM\s*VIỆC|EMPLOYMENT)\b', re.IGNORECASE)
-        # Các tiêu đề dễ xuất hiện ngay sau phần Kinh nghiệm để chặn lại
         self.next_header = re.compile(r'(?:EDUCATION|HỌC\s*VẤN|SKILLS?|KỸ\s*NĂNG|PROJECTS?|DỰ\s*ÁN|CERTIFICATES?|CHỨNG\s*CHỈ)\b', re.IGNORECASE)
 
     def _classify_level(self, years: int, text: str) -> str:
         text_lower = text.lower()
-        if any(w in text_lower for w in ["senior", "lead", "manager"]): return "Senior"
-        if any(w in text_lower for w in ["junior"]): return "Junior"
-        if any(w in text_lower for w in ["intern", "fresher"]): return "Intern/Fresher"
+        if any(w in text_lower for w in ["senior", "lead", "manager", "principal", "staff"]): return "Senior"
+        if any(w in text_lower for w in ["junior", "associate"]): return "Junior"
+        if any(w in text_lower for w in ["intern", "fresher", "trainee", "thực tập"]): return "Intern/Fresher"
 
         if years < 1: return "Intern/Fresher"
         elif 1 <= years < 3: return "Junior"
@@ -272,26 +341,25 @@ class ExperienceExtractor:
         current_year = now.year
         current_month = now.month
 
-        # SỬA LỖI 1: Bắt số năm trực tiếp thật chặt chẽ (Chỉ bắt chữ "years of experience")
+        # Bắt số năm trực tiếp (VD: "3 years of experience")
         search_area = (raw_exp_str + " \n " + text) if raw_exp_str else text
         year_explicit = re.search(r'(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?|năm)(?:\s*(?:of\s*)?(?:experience|kinh\s*nghiệm))', search_area, re.IGNORECASE)
         if year_explicit:
             yrs = int(round(float(year_explicit.group(1))))
             return {"years": yrs, "level": self._classify_level(yrs, search_area)}
 
-        # SỬA LỖI 2: CÔ LẬP CHÍNH XÁC VÙNG KINH NGHIỆM ĐỂ QUÉT NGÀY THÁNG
+        # Cô lập vùng kinh nghiệm để quét ngày tháng
         exp_section = text
         exp_match = self.exp_header.search(text)
         if exp_match:
             start_idx = exp_match.end()
             next_match = self.next_header.search(text[start_idx:])
             if next_match:
-                # Nếu thấy section tiếp theo (VD: Education), chặt đứt văn bản tại đó
                 exp_section = text[start_idx : start_idx + next_match.start()]
             else:
                 exp_section = text[start_idx:]
 
-        # Lúc này exp_section chỉ còn thuần túy lịch sử làm việc, không sợ lẫn ngày ra trường
+        # Quét khoảng ngày tháng trong vùng kinh nghiệm
         date_ranges = re.findall(
             r'\b(?:(\d{1,2})[/.\-])?(20\d{2})\s*[-–—tođến]+\s*(?:(\d{1,2})[/.\-])?(20\d{2}|present|nay|hiện\s*tại)\b',
             exp_section, re.IGNORECASE
@@ -317,6 +385,7 @@ class ExperienceExtractor:
                     intervals.append([start_abs, end_abs])
 
             if intervals:
+                # Merge Intervals để tránh đếm trùng
                 intervals.sort(key=lambda x: x[0])
                 merged = [intervals[0]]
                 for current in intervals[1:]:
@@ -326,7 +395,6 @@ class ExperienceExtractor:
                     else:
                         merged.append(current)
 
-                # SỬA LỖI 3: Cộng 1 vào khoảng tháng (Inclusive Month) 
                 total_months = sum((end - start + 1) for start, end in merged)
                 total_years = int(round(total_months / 12.0))
                 return {"years": total_years, "level": self._classify_level(total_years, exp_section)}
@@ -334,9 +402,9 @@ class ExperienceExtractor:
         return {"years": 0, "level": self._classify_level(0, exp_section)}
 
 # =====================================================================
-# TẦNG 3: ĐIỀU PHỐI (ORCHESTRATION) - MULTIPROCESSING
+# TẦNG 3: ĐIỀU PHỐI (ORCHESTRATION)
 # =====================================================================
-# CẢI TIẾN: Biến toàn cục để khởi tạo mô hình AI trong từng tiến trình con
+# Biến toàn cục cho multiprocessing worker
 worker_skill_extractor = None
 worker_exp_extractor = None
 
@@ -346,25 +414,27 @@ def init_worker():
     worker_exp_extractor = ExperienceExtractor()
 
 def process_single_cv_task(cv_data: Tuple[str, str]) -> dict:
+    """Hàm xử lý 1 CV - dùng cho cả single-thread và multiprocessing."""
     cv_id, text = cv_data
     contact_info = extract_contact_and_labeled_fields(text)
     
-    # Sử dụng object đã được load sẵn trong Worker
-    skills_list = worker_skill_extractor.extract_skills(text)
-    experience = worker_exp_extractor.extract_experience(text, contact_info.get("raw_experience_str"))
+    # Dùng worker globals nếu có (multiprocessing), nếu không tự tạo (single-thread)
+    skill_ext = worker_skill_extractor or SkillExtractor()
+    exp_ext = worker_exp_extractor or ExperienceExtractor()
     
-    # CẢI TIẾN: Ép format output DataFrame gồm 4 cột
+    skills_list = skill_ext.extract_skills(text)
+    experience = exp_ext.extract_experience(text, contact_info.get("raw_experience_str"))
+    
+    # ĐỒNG BỘ KEY VỚI app.py: "skill" (list), "năm kinh nghiệm", "level công việc"
     return {
-        "id": cv_id,
-        "danh sách skills": ", ".join(skills_list) if skills_list else "",
+        "skill": skills_list,
         "năm kinh nghiệm": experience.get("years"),
-        "vị trí việc làm": experience.get("level")
+        "level công việc": experience.get("level")
     }
 
 class CVParserPipeline:
     def __init__(self):
         self.ingestor = CVDataIngestor()
-        # Không khởi tạo Extractor ở đây để tránh crash RAM
 
     def run(self, input_path: str) -> pd.DataFrame:
         print(f"Đang nạp dữ liệu từ: {input_path}...")
@@ -374,43 +444,48 @@ class CVParserPipeline:
             print("Không tìm thấy CV nào hợp lệ!")
             return pd.DataFrame()
 
-        print(f"Đã nạp {len(raw_cvs)} CV. Ép xung đa tiến trình (ProcessPool)...")
         final_results = []
 
-        # CẢI TIẾN: Truyền initializer chống nghẽn bộ nhớ
-        with concurrent.futures.ProcessPoolExecutor(initializer=init_worker) as executor:
-            futures = [executor.submit(process_single_cv_task, data) for data in raw_cvs]
-            for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
-                try:
-                    final_results.append(future.result())
-                except Exception as e:
-                    print(f"Lỗi khi xử lý CV: {e}")
-
-                if i % 10 == 0 or i == len(raw_cvs):
-                    print(f"  -> Đã bóc tách {i}/{len(raw_cvs)} CV...")
+        if len(raw_cvs) == 1:
+            # Single CV (Streamlit upload) → chạy trực tiếp, không cần ProcessPool
+            try:
+                final_results.append(process_single_cv_task(raw_cvs[0]))
+            except Exception as e:
+                print(f"Lỗi khi xử lý CV: {e}")
+        else:
+            # Nhiều CV → dùng ProcessPoolExecutor
+            print(f"Đã nạp {len(raw_cvs)} CV. Đang xử lý đa tiến trình...")
+            with concurrent.futures.ProcessPoolExecutor(initializer=init_worker) as executor:
+                futures = [executor.submit(process_single_cv_task, data) for data in raw_cvs]
+                for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
+                    try:
+                        final_results.append(future.result())
+                    except Exception as e:
+                        print(f"Lỗi khi xử lý CV: {e}")
+                    if i % 10 == 0 or i == len(raw_cvs):
+                        print(f"  -> Đã bóc tách {i}/{len(raw_cvs)} CV...")
 
         df_final = pd.DataFrame(final_results)
-        print(f"XONG ! Đã return DataFrame với shape: {df_final.shape}")
+        print(f"XONG! Đã return DataFrame với shape: {df_final.shape}")
         return df_final
 
 
 # =====================================================================
-# KHỐI CHẠY KIỂM THỬ THỰC TẾ (RUN SCRIPT)
+# KHỐI CHẠY KIỂM THỬ
 # =====================================================================
 if __name__ == "__main__":
-    INPUT_FOLDER = r"/content/drive/MyDrive/HACKATHON raw/Dũng/20_cv_doi_chieu_individual_pdfs"
+    INPUT_FOLDER = r"/content/drive/MyDrive/HACKATHON raw/Dũng/20_cv_doi_chieu_individual_pdfs"
     
     if os.path.exists(INPUT_FOLDER):
         pipeline = CVParserPipeline()
         df_cv = pipeline.run(INPUT_FOLDER)
         
         if not df_cv.empty:
-            # CẤU HÌNH PANDAS ĐỂ HIỂN THỊ FULL BẢNG
             pd.set_option('display.max_columns', None)
-            pd.set_option('display.max_rows', None)  # Bật hiển thị toàn bộ số dòng
+            pd.set_option('display.max_rows', None)
             pd.set_option('display.width', 1000)
             
             print("\n✅ Đã tạo DataFrame thành công trên RAM!")
-            print(df_cv)  # Bỏ .head() để in ra toàn bộ
+            print(df_cv)
     else:
         print(f"Đường dẫn không tồn tại: {INPUT_FOLDER}")

@@ -11,20 +11,20 @@ import matplotlib
 import json
 
 def _find_root() -> Path:
-    """Tim thu muc goc cua project (thu muc chua `models/` va `data/`).
+    """Tim thu muc goc cua project (thu muc chua `models/`, `pickle/` va `data/`).
 
     - Truong hop chuan: file nay nam o `core/SHAP_TreeExplainer.py`
       thi root la cha cua `core/`.
     - Truong hop file bi copy di cho khac: di nguoc len cac thu muc cha,
-      thu muc nao chua `models/` hoac ten la `career_lens_the404` thi lay.
+      thu muc nao chua `models/`, `pickle/` hoac ten la `career_lens_the404` thi lay.
     """
     p = Path(__file__).resolve()
     # truong hop chuan: core/SHAP_TreeExplainer.py -> root la cha cua core/
     if p.parent.name == "core":
         return p.parent.parent
-    # file dang nam o root hoac cho khac: do len tim thu muc co models/
+    # file dang nam o root hoac cho khac: do len tim thu muc co models/ hoac pickle/
     for anc in [p.parent, *p.parents]:
-        if (anc / "models").exists():
+        if (anc / "models").exists() or (anc / "pickle").exists():
             return anc
         if anc.name == "career_lens_the404":
             return anc
@@ -32,34 +32,44 @@ def _find_root() -> Path:
 
 
 # --- Duong dan dung chung cho ca file ---
-ROOT = _find_root()          # vd: .../career_lens_the404/career_lens_the404
-PICKLE_DIR = ROOT / "models"  # noi chua 3 file model/encoder
+ROOT = _find_root()          # vd: .../career_lens_the404
 DATA_DIR = ROOT / "data"      # noi chua job.csv (du lieu thi truong)
 
-# Anh xa ten logic -> ten file thuc te tren dia.
-# Phai khop tuyet doi voi file trong thu muc models/,
-# neu sai 1 ky tu se roi vao FileNotFoundError o ham load_pickle.
-PICKLE_FILES = {
-    "gbm_model": "gbm_model.pkl",
-    "mlb": "mlb.pkl",
-    "feature_names": "feature_names.pkl",
+# Danh sach thu muc co the chua model artifacts (uu tien models/ roi den pickle/)
+CANDIDATE_DIRS = [ROOT / "models", ROOT / "pickle"]
+
+# Cac ten file kha di cho tung artifact (ho tro ca .pkl va ._pkl)
+PICKLE_FILE_CANDIDATES = {
+    "gbm_model": ["gbm_model.pkl", "gbm_model._pkl"],
+    "mlb": ["mlb.pkl", "mlb._pkl"],
+    "feature_names": ["feature_names.pkl", "feature_names._pkl"],
 }
 
 
 def load_pickle(stem: str):
-    """Nap 1 artifact theo key trong PICKLE_FILES.
+    """Nap 1 artifact theo key trong PICKLE_FILE_CANDIDATES.
 
-    Vi du: load_pickle("gbm_model") -> doc file models/gbm_model.pkl.
-    Neu file khong ton tai thi bao ro ca duong dan + ROOT de de debug.
+    Tu dong tim kiem trong cac thu muc `models/` hoac `pickle/`,
+    ho tro ca duoi chuan `.pkl` va duoi `._pkl` (duoc danh dau tren git).
     """
-    path = PICKLE_DIR / PICKLE_FILES[stem]
-    if not path.exists():
-        raise FileNotFoundError(f"Khong thay {path} | ROOT={ROOT}")
-    try:
-        return joblib.load(path)
-    except Exception as e:
-        print(f"Loi khi nap pickle tu {path}: {str(e)}")
-        raise
+    searched = []
+    candidates = PICKLE_FILE_CANDIDATES.get(stem, [f"{stem}.pkl", f"{stem}._pkl"])
+    for directory in CANDIDATE_DIRS:
+        for fname in candidates:
+            target = directory / fname
+            searched.append(str(target))
+            if target.exists():
+                try:
+                    return joblib.load(target)
+                except Exception as e:
+                    print(f"Loi khi nap pickle tu {target}: {str(e)}")
+                    raise
+
+    raise FileNotFoundError(
+        f"Khong tim thay artifact '{stem}'. Da tim trong cac duong dan:\n"
+        + "\n".join(f"  - {p}" for p in searched)
+        + f"\nROOT={ROOT}"
+    )
 
 
 def resolve_data() -> Path:
@@ -154,10 +164,25 @@ def encode_cv(cv_dict: dict) -> pd.DataFrame:
     4. Ghep 3 khoi lai, xoa cot trung (neu co), roi reindex ve
        dung 579 cot cua feature_names (thieu cot nao thi dien 0).
     """
-    raw = cv_dict.get("skills", [])
+    raw = cv_dict.get("skills") if cv_dict.get("skills") is not None else cv_dict.get("skill", [])
     if isinstance(raw, str):
         raw = raw.split(",")
     skill_list = [str(s).strip() for s in raw if str(s).strip()]
+
+    raw_level = str(cv_dict.get("level") or cv_dict.get("level công việc", "") or "").strip()
+    norm_level = raw_level
+    if raw_level in ["Mid", "Mid-Level", "Middle"]:
+        norm_level = "Middle"
+    elif raw_level in ["Junior", "Intern", "Fresher", "Intern/Fresher"]:
+        norm_level = "Junior"
+    elif raw_level in ["Senior", "Lead", "Manager"]:
+        norm_level = "Senior"
+
+    job_title = cv_dict.get("job_title") or cv_dict.get("vị trí", "Developer")
+    location = cv_dict.get("location") or cv_dict.get("địa điểm", "Hanoi")
+    years_val = cv_dict.get("years_experience")
+    if years_val is None:
+        years_val = cv_dict.get("năm kinh nghiệm", 0.0)
 
     # One-hot skills theo dung thu tu _SKILL_COLS da dedup.
     skill_arr = mlb.transform([skill_list])
@@ -165,29 +190,29 @@ def encode_cv(cv_dict: dict) -> pd.DataFrame:
 
     # One-hot 3 cot categorical cua 1 CV.
     cat_df = pd.get_dummies(pd.DataFrame([{
-        "job_title": cv_dict.get("job_title"),
-        "level": cv_dict.get("level"),
-        "location": cv_dict.get("location"),
+        "job_title": job_title,
+        "level": norm_level,
+        "location": location,
     }]))
     # Dedup ten cot categorical theo sau cot skill (tranh trung cheo).
     cat_df.columns = _dedup_names(list(cat_df.columns), _SKILL_COLS)
 
-    # Khởi tạo DataFrame toàn số 0 theo đúng số lượng và thứ tự cột lúc train
-    X_input = pd.DataFrame(0, index=[0], columns=feature_names)
+    # Khởi tạo DataFrame toàn số 0 theo đúng số lượng và thứ tự cột lúc train (dung float de nhan ca float)
+    X_input = pd.DataFrame(0.0, index=[0], columns=feature_names)
 
     # Bơm dữ liệu skills (One-hot) vào đúng tọa độ
     s_cols = [c for c in skill_df.columns if c in X_input.columns]
     if s_cols:
-        X_input[s_cols] = skill_df[s_cols]
+        X_input[s_cols] = skill_df[s_cols].astype(float)
 
     # Bơm dữ liệu categorical (Job title, Level, Location)
     cat_cols = [c for c in cat_df.columns if c in X_input.columns]
     if cat_cols:
-        X_input[cat_cols] = cat_df[cat_cols]
+        X_input[cat_cols] = cat_df[cat_cols].astype(float)
 
     # Bơm dữ liệu dạng số (Years of Experience)
     if "years_experience" in X_input.columns:
-        X_input.at[0, "years_experience"] = cv_dict.get("years_experience", 0)
+        X_input.at[0, "years_experience"] = float(years_val or 0.0)
 
     return X_input
 
@@ -273,7 +298,7 @@ def get_market_context(n_sample: int = 1000):
     num_all = df[["years_experience"]]
     
     # Khởi tạo DataFrame toàn số 0 cho tập thị trường
-    X_all = pd.DataFrame(0, index=df.index, columns=feature_names)
+    X_all = pd.DataFrame(0.0, index=df.index, columns=feature_names)
     
     # Bơm dữ liệu theo từng block
     s_cols = [c for c in s_df.columns if c in X_all.columns]
@@ -302,17 +327,54 @@ def get_market_context(n_sample: int = 1000):
     return ctx
 
 
-def explain_cv(cv_dict: dict, include_detail: bool = False):
-    """Giai thich 1 CV: du doan luong + diem manh/yeu + vi tri phan tram.
+def recommend_skills_to_add(x_cv: pd.DataFrame, pred_base: float, top_n: int = 5) -> list:
+    """Tinh danh sach cac skill CV con thieu ma neu bo sung thi luong duoc + them nhieu nhat.
+
+    Mo phong Counterfactual: gan tung missing skill = 1 roi du doan luong moi.
+    Ket qua tra ve top N skill duoc sap xep theo thu tu TANG DAN cua muc luong
+    duoc cong them (salary_boost).
+    """
+    missing_cols = [c for c in _SKILL_COLS if c in x_cv.columns and x_cv.at[0, c] == 0]
+    if not missing_cols:
+        return []
+
+    # Batch predict de toi uu hoa toc do chay
+    X_batch = pd.concat([x_cv] * len(missing_cols), ignore_index=True)
+    for i, c in enumerate(missing_cols):
+        X_batch.at[i, c] = 1.0
+
+    preds = np.asarray(gbm.predict(X_batch)).ravel()
+    diffs = preds - pred_base
+
+    candidates = []
+    for c, diff, new_p in zip(missing_cols, diffs, preds):
+        boost = round(float(diff), 2)
+        if boost > 0.0:  # chi lay skill thuc su lam tang luong
+            candidates.append({
+                "skill": pretty(c),
+                "salary_boost": boost,
+                "new_salary": round(float(new_p), 2),
+            })
+
+    # Lay top N skill co tac dong tang luong cao nhat
+    top_candidates = sorted(candidates, key=lambda x: x["salary_boost"], reverse=True)[:top_n]
+    # Sap xep TANG DAN theo yeu cau
+    top_candidates.sort(key=lambda x: x["salary_boost"])
+    return top_candidates
+
+
+def explain_cv(cv_dict: dict, top_n_recommend: int = 5, include_detail: bool = False):
+    """Giai thich 1 CV: du doan luong + diem manh/yeu + vi tri phan tram + skill can bo sung.
 
     Cong thuc kiem tra tinh dung dan cua encode:
         predicted_salary gan bang base_value + tong(shap_values).
     Neu lech qua 0.01 thi encode dang sai (sai thu tu cot / sai dedup).
 
-    Tra ve dict 2 nhom:
+    Tra ve dict:
     - market_baseline: luong baseline + top ky nang dang gia nhat thi truong.
     - user_cv_valuation: luong du doan cua CV, phan tram so voi thi truong,
-      top 5 strengths (shap > 0 va CV co feature do), top 5 weaknesses (shap < 0).
+      top 5 strengths (shap > 0 va CV co feature do), top 5 weaknesses (shap < 0),
+      skills_to_supplement: top skill can bo sung kem luong duoc cong them, sap xep tang dan.
     - Neu include_detail=True thi kem them bang detail day du de debug.
     """
     x_cv = encode_cv(cv_dict)
@@ -331,9 +393,20 @@ def explain_cv(cv_dict: dict, include_detail: bool = False):
         "shap": shap_cv,
     }).sort_values("shap", ascending=False)
 
-    strengths = detail[(detail["shap"] > 0) & (detail["value"] != 0)]
-    weaknesses = detail[detail["shap"] < 0].head(5)
+    # Chi loc cac dac trung thuc su la KY NANG (loai bo location, years_experience, job_title, level)
+    strengths = detail[
+        (detail["shap"] > 0) & 
+        (detail["value"] != 0) & 
+        (detail["feature"].isin(_SKILL_COLS))
+    ]
+    weaknesses = detail[
+        (detail["shap"] < 0) & 
+        (detail["feature"].isin(_SKILL_COLS))
+    ].head(5)
     percentile = float(percentileofscore(market_preds, pred))
+
+    # Tinh danh sach cac skill can bo sung sap xep tang dan
+    skills_to_supplement = recommend_skills_to_add(x_cv, pred, top_n=top_n_recommend)
 
     out = {
         "market_baseline": {
@@ -351,6 +424,7 @@ def explain_cv(cv_dict: dict, include_detail: bool = False):
                 {"skill": pretty(r["feature"]), "impact": float(r["shap"])}
                 for _, r in weaknesses.iterrows()
             ],
+            "skills_to_supplement": skills_to_supplement,
         },
     }
     if include_detail:
@@ -383,6 +457,13 @@ def plot_waterfall(cv_dict: dict, max_display: int = 12):
 
 
 if __name__ == "__main__":
+    import sys
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     # Demo chay truc tiep file nay de test nhanh pipeline:
     # encode -> predict -> SHAP -> in ket qua JSON ra terminal.
     demo = {
@@ -393,8 +474,18 @@ if __name__ == "__main__":
         "skills": ["Python", "Django", "PostgreSQL"],
     }
     print(f"ROOT={ROOT} | DATA={DATA_PATH}")
-    res = explain_cv(demo)
+    res = explain_cv(demo, top_n_recommend=5)
+
+    print("\n--- KET QUA DINH GIA & SHAP ---")
     print(json.dumps(
         {k: v for k, v in res.items() if not k.startswith("_")},
         indent=2, ensure_ascii=False
     ))
+
+    print("\n=== CAC SKILL CAN BO SUNG DE TANG LUONG (SAP XEP TANG DAN) ===")
+    skills_sup = res["user_cv_valuation"].get("skills_to_supplement", [])
+    if skills_sup:
+        for idx, item in enumerate(skills_sup, start=1):
+            print(f"  {idx}. Ky nang: {item['skill']:<20} | Luong cong them: +{item['salary_boost']:>5.2f} trieu | Luong moi dat: {item['new_salary']:>5.2f} trieu")
+    else:
+        print("  Ho so da co day du cac ky nang toi uu trong thi truong.")

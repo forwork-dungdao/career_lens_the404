@@ -217,7 +217,7 @@ def main():
                         marker_line_width=0,
                         hovertemplate="<b>%{y}</b><br>Tỷ lệ: %{x:.1f}%<extra></extra>"
                     )
-                    st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(fig_bar, width='stretch', config={"displayModeBar": False})
 
         # Cột Phải: Donut & Heatmap
         with col_right:
@@ -250,7 +250,7 @@ def main():
                     textinfo='percent+label',
                     hovertemplate="<b>%{label}</b><br>Số lượng: %{value}<br>Tỷ lệ: %{percent}<extra></extra>"
                 )
-                st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_donut, width='stretch', config={"displayModeBar": False})
             
             # Biểu đồ Heatmap
             with st.container(border=True):
@@ -287,7 +287,7 @@ def main():
                 fig_heat.update_traces(
                     hovertemplate="<b>%{y} - %{x}</b><br>Lương TB: %{z:.1f} triệu<extra></extra>"
                 )
-                st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_heat, width='stretch', config={"displayModeBar": False})
 
 
     def salary_predictor():
@@ -318,7 +318,7 @@ def main():
                 with st.container(border=True):
                     st.markdown("<h3 style='text-align: center;'>Tải lên CV của bạn</h3>", unsafe_allow_html=True)
                     st.caption("<div style='text-align: center;'>Định dạng hỗ trợ: .pdf, .docx - Giới hạn: 10 MB</div>", unsafe_allow_html=True)
-                    up = st.file_uploader("", type=["pdf", "docx"], label_visibility="collapsed")
+                    up = st.file_uploader("Chọn file CV", type=["pdf", "docx"], label_visibility="collapsed")
                     
                     if up is not None:
                         with st.status("AI đang trích xuất dữ liệu kỹ năng và kinh nghiệm…", expanded=True) as s:
@@ -405,7 +405,7 @@ def main():
                             else:
                                 st.info("Không tìm thấy kỹ năng IT cụ thể.")
                                 
-                    if st.button("Phân tích CV khác", use_container_width=True, type="primary"):
+                    if st.button("Phân tích CV khác", width="stretch", type="primary"):
                         st.session_state["cv_done"] = False
                         st.session_state["cv_data"] = None
                         st.rerun()
