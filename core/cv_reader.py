@@ -1,3 +1,4 @@
+ 
 import os
 import glob
 import re
@@ -283,13 +284,11 @@ class CVParserPipeline:
         skills_list = self.skill_extractor.extract_skills(text)
         experience = self.exp_extractor.extract_experience(text, contact_info.get("raw_experience_str"))
         
+        # CHỈNH SỬA: Chỉ trả về đúng 3 trường dữ liệu được yêu cầu
         return {
-            "candidate_id": cv_id,
-            "skills": skills_list,
-            "level": experience.get("level"),
-            "years": experience.get("years"),
-            "email": contact_info.get("email"),
-            "phone": contact_info.get("phone")
+            "skill": skills_list,
+            "năm kinh nghiệm": experience.get("years"),
+            "level công việc": experience.get("level")
         }
 
     def run(self, input_path: str) -> pd.DataFrame:
@@ -325,16 +324,15 @@ class CVParserPipeline:
 # =====================================================================
 if __name__ == "__main__":
     # ĐỔI ĐƯỜNG DẪN Ở ĐÂY
-    INPUT_FOLDER = r"dán đường dẫn"
-    OUTPUT_CSV = r"dán đường dẫn"
+    INPUT_FOLDER = r"dán link của bạn ở đây "
     
     if os.path.exists(INPUT_FOLDER):
         pipeline = CVParserPipeline()
-        df = pipeline.run(INPUT_FOLDER)
+        df_cv = pipeline.run(INPUT_FOLDER)
         
-        if not df.empty:
-            print(df.head())
-            df.to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
-            print(f"Đã lưu kết quả tại: {OUTPUT_CSV}")
+        # CHỈNH SỬA: Bỏ xuất CSV, hiển thị thẳng DataFrame trên RAM
+        if not df_cv.empty:
+            print("\n Đã tạo DataFrame thành công trên RAM!")
+            print(df_cv.head())
     else:
         print(f" Đường dẫn không tồn tại: {INPUT_FOLDER}")
