@@ -108,7 +108,7 @@ Dashboard nạp dữ liệu tại đường dẫn tương đối với `app.py`:
 | `level` | Thống kê cấp độ tuyển dụng |
 | `location` | Lọc các địa điểm có nhiều tin tuyển dụng |
 | `avg_salary` | Tính mức lương trung bình và tạo heatmap |
-| `skills` (hoặc `skill`) | Danh sách kỹ năng, dùng cho thống kê và mô hình |
+| `skills` | Danh sách kỹ năng, dùng cho thống kê và mô hình |
 | `years_experience` | Số năm kinh nghiệm, dùng trong quy trình huấn luyện mô hình |
 
 Một số cột chỉ được dùng bởi các mô-đun phụ trợ. Nếu thiếu cột mà một mô-đun yêu cầu, quy trình đó có thể báo lỗi dù Dashboard vẫn có thể chạy nếu các cột hiển thị biểu đồ còn đủ.
@@ -128,4 +128,3 @@ Các script trong `core/` là công cụ xử lý riêng; chạy ứng dụng b�
 - Giao diện Salary Predictor gọi `core/cv_reader.py` và sau đó nạp artifacts `mlb.pkl`, `gbm_model.pkl`, `feature_names.pkl` từ `models/`.
 - Parser trả về các trường như `skills`, `years`, `level`, trong khi phần dự đoán trong `app.py` hiện đọc `skill`, `năm kinh nghiệm`, `level công việc`. Cần đồng bộ các tên trường để thông tin CV được đưa đầy đủ vào mô hình.
 - `core/salary_predictor.py` đọc dữ liệu và bắt đầu huấn luyện ngay khi module được import. Chỉ chạy quy trình này khi dữ liệu đầu vào đã sẵn sàng và bạn chủ động muốn huấn luyện.
-- Repository có artifacts cũ trong `pickle/` với hậu tố `._pkl`; ứng dụng hiện tìm các file `.pkl` theo tên chuẩn trong `models/'.
