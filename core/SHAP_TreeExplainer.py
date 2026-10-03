@@ -1,47 +1,50 @@
-"""SHAP TreeExplainer cho CareerLens. Đặt trong core/, clone về chạy ngay."""
 import re
 from pathlib import Path
-
 import joblib
 import shap
 import pandas as pd
 import numpy as np
 from scipy.stats import percentileofscore
-
+import matplotlib.pyplot as plt
+import json
 
 def _find_root() -> Path:
     p = Path(__file__).resolve()
+    # truong hop chuan: core/SHAP_TreeExplainer.py -> root la cha cua core/
+    if p.parent.name == "core":
+        return p.parent.parent
+    # file dang nam o root hoac cho khac: do len tim thu muc co pickle/
     for anc in [p.parent, *p.parents]:
-        if (anc / "pickle").exists() or (anc / "core").exists():
+        if (anc / "pickle").exists():
             return anc
-    return p.parent.parent  # fallback: core/shap_tree_explainer.py -> root
+        if anc.name == "career_lens_the404":
+            return anc
+    return p.parent
 
 
 ROOT = _find_root()
 PICKLE_DIR = ROOT / "pickle"
 DATA_DIR = ROOT / "data"
 
+PICKLE_FILES = {
+    "gbm_model": "gbm_model_.pkl",
+    "mlb": "mlb_.pkl",
+    "feature_names": "feature_names_.pkl",
+}
+
 
 def load_pickle(stem: str):
-    cands = [
-        PICKLE_DIR / f"{stem}_.pkl",   # tên hiện tại trên GitHub
-        PICKLE_DIR / f"{stem}._pkl",
-        PICKLE_DIR / f"{stem}.pkl",    # tên chuẩn local
-    ]
-    for cand in cands:
-        if cand.exists():
-            return joblib.load(cand)
-    raise FileNotFoundError(
-        f"Không thấy {stem} trong {PICKLE_DIR}, đã thử: {[c.name for c in cands]}"
-    )
+    path = PICKLE_DIR / PICKLE_FILES[stem]
+    if not path.exists():
+        raise FileNotFoundError(f"Khong thay {path} | ROOT={ROOT}")
+    return joblib.load(path)
 
 
 def resolve_data() -> Path:
-    for name in ["job.csv", "market_jobs.csv", "rf_train_data.csv"]:
-        cand = DATA_DIR / name
-        if cand.exists():
-            return cand
-    raise FileNotFoundError(f"Không thấy csv nào trong {DATA_DIR}")
+    path = DATA_DIR / "job.csv"
+    if not path.exists():
+        raise FileNotFoundError(f"Khong thay {path} | ROOT={ROOT}")
+    return path
 
 
 gbm = load_pickle("gbm_model")
@@ -63,13 +66,15 @@ def pretty(name: str) -> str:
 
 
 def encode_cv(cv_dict: dict) -> pd.DataFrame:
-    raw_skills = cv_dict.get("skills", [])
-    if isinstance(raw_skills, str):
-        raw_skills = [s for s in raw_skills.split(",")]
-    skill_list = [str(s).strip() for s in raw_skills if str(s).strip()]
+    raw = cv_dict.get("skills", [])
+    if isinstance(raw, str):
+        raw = raw.split(",")
+    skill_list = [str(s).strip() for s in raw if str(s).strip()]
 
     skill_arr = mlb.transform([skill_list])
-    skill_df = pd.DataFrame(skill_arr, columns=[skill_to_col[s] for s in mlb.classes_])
+    skill_df = pd.DataFrame(
+        skill_arr, columns=[skill_to_col[s] for s in mlb.classes_]
+    )
 
     cat_df = pd.get_dummies(pd.DataFrame([{
         "job_title": cv_dict.get("job_title"),
@@ -84,7 +89,6 @@ def encode_cv(cv_dict: dict) -> pd.DataFrame:
     return X_one.reindex(columns=feature_names, fill_value=0)
 
 
-# ---- lazy objects: chỉ tính khi cần, import không chạy nặng ----
 _explainer = None
 _base_value = None
 _market_cache = {}
@@ -113,7 +117,7 @@ def _shap_2d(explainer, X: pd.DataFrame) -> np.ndarray:
     else:
         out = explainer(X).values
     arr = np.asarray(out)
-    if arr.ndim == 3:  # một số bản trả (n, m, 2) cho classifier
+    if arr.ndim == 3:
         arr = arr[:, :, 0]
     return arr
 
@@ -124,13 +128,14 @@ def get_market_context(n_sample: int = 1000):
         return _market_cache[key]
 
     df = pd.read_csv(DATA_PATH)
-    print(f"DATA_PATH: {DATA_PATH} | cols: {df.columns.tolist()}")
     skill_col = "skill" if "skill" in df.columns else "skills"
     df["skill_list"] = df[skill_col].apply(
         lambda x: [s.strip() for s in str(x).split(",")] if pd.notnull(x) else []
     )
-    skill_encoded = mlb.transform(df["skill_list"])
-    s_df = pd.DataFrame(skill_encoded, columns=[skill_to_col[s] for s in mlb.classes_])
+    s_df = pd.DataFrame(
+        mlb.transform(df["skill_list"]),
+        columns=[skill_to_col[s] for s in mlb.classes_],
+    )
     cat_all = pd.get_dummies(df[["job_title", "level", "location"]])
     cat_all.columns = [clean_col(c) for c in cat_all.columns]
     num_all = df[["years_experience"]]
@@ -155,17 +160,14 @@ def get_market_context(n_sample: int = 1000):
 
 def explain_cv(cv_dict: dict, include_detail: bool = False):
     x_cv = encode_cv(cv_dict)
-    explainer = get_explainer()
     base_value = get_base_value()
-    _, market_preds, _, top_global_skills = get_market_context()
+    _, market_preds, _, top_global = get_market_context()
 
-    shap_cv = _shap_2d(explainer, x_cv)[0]
+    shap_cv = _shap_2d(get_explainer(), x_cv)[0]
     pred = float(np.asarray(gbm.predict(x_cv)).ravel()[0])
 
     if abs(pred - (base_value + shap_cv.sum())) > 1e-2:
-        raise ValueError(
-            f"Lệch encode so với lúc train: pred={pred}, base+sum={base_value + shap_cv.sum()}"
-        )
+        raise ValueError(f"Lech encode: pred={pred}, base+sum={base_value + shap_cv.sum()}")
 
     detail = pd.DataFrame({
         "feature": feature_names,
@@ -180,7 +182,7 @@ def explain_cv(cv_dict: dict, include_detail: bool = False):
     out = {
         "market_baseline": {
             "base_salary": base_value,
-            "top_global_skills": [pretty(c) for c in top_global_skills.index.tolist()],
+            "top_global_skills": [pretty(c) for c in top_global.index.tolist()],
         },
         "user_cv_valuation": {
             "predicted_salary": pred,
@@ -201,9 +203,7 @@ def explain_cv(cv_dict: dict, include_detail: bool = False):
 
 
 def plot_waterfall(cv_dict: dict, max_display: int = 12):
-    import matplotlib
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
 
     x_cv = encode_cv(cv_dict)
     shap_cv = _shap_2d(get_explainer(), x_cv)[0]
@@ -227,7 +227,9 @@ if __name__ == "__main__":
         "years_experience": 2.5,
         "skills": ["Python", "Django", "PostgreSQL"],
     }
-    import json
+    print(f"ROOT={ROOT} | DATA={DATA_PATH}")
     res = explain_cv(demo)
-    print(json.dumps({k: v for k, v in res.items() if not k.startswith("_")},
-                     indent=2, ensure_ascii=False))
+    print(json.dumps(
+        {k: v for k, v in res.items() if not k.startswith("_")},
+        indent=2, ensure_ascii=False
+    ))

@@ -9,7 +9,7 @@ import joblib
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any, Set
 import concurrent.futures
-import fitz  
+import pymupdf  as fitz
 import pandas as pd
 import spacy
 from spacy.matcher import PhraseMatcher

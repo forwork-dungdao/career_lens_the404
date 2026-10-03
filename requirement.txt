@@ -9,5 +9,21 @@ plotly>=5.17.0
 lightgbm>=4.0.0
 spacy>=3.7
 python-docx>=1.1
+<<<<<<< HEAD
 spacy>=3.7
 python-docx>=1.1
+=======
+shap
+matplotlib
+
+
+# thu vien front-end
+streamlit-extras 
+streamlit-antd-components 
+streamlit-shadcn-ui  
+streamlit-option-menu 
+extra-streamlit-components 
+streamlit-aggrid 
+itables 
+pygwalker
+>>>>>>> bea17dc (req_update)
