@@ -1,21 +1,3 @@
-"""SHAP TreeExplainer cho mo hinh du doan luong (LightGBM).
-
-Y tuong chung cua file nay:
-1. Nap cac artifact da train san tu thu muc `pickle/`:
-   - `gbm_model`: mo hinh LightGBM hoi quy luong (avg_salary).
-   - `mlb`: MultiLabelBinarizer de ma hoa danh sach ky nang.
-   - `feature_names`: thu tu 579 cot dac trung luc train.
-2. Ma hoa 1 CV moi (skills + job_title/level/location + years_experience)
-   thanh vector dung thu tu `feature_names` de dua vao model.
-3. Dung SHAP TreeExplainer de giai thich: diem manh nao cong tien,
-   diem yeu nao tru tien, nguoi dung dang o phan tram nao cua thi truong.
-
-Luu y quan trong ve ten file pickle:
-- `.gitignore` chan `*.pkl` nen khong push truc tiep len GitHub duoc.
-- Team doi ten thanh `._pkl` (vd `gbm_model._pkl`) de "l ach" gitignore.
-- Vi vay `PICKLE_FILES` o duoi phai dung duoi `._pkl`, khong phai `.pkl`.
-"""
-
 import re
 from pathlib import Path
 import joblib
