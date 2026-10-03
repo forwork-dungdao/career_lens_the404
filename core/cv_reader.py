@@ -36,7 +36,6 @@ class CVDataIngestor:
         )
         self.email_pattern = re.compile(r'[\w\.-]+@[\w\.-]+\.\w+')
 
-    # [KHỐI ĐẦU VÀO DỮ LIỆU CHÍNH]
     def run(self, input_path: str) -> List[Tuple[str, str]]:
         raw_data: List[Tuple[str, str]] = []
         
@@ -106,7 +105,8 @@ class CVDataIngestor:
             for page in doc:
                 blocks = page.get_text("blocks")
                 text_blocks = [b for b in blocks if b[6] == 0]
-                text_blocks.sort(key=lambda b: (b[1], b[0]))
+                # CẢI TIẾN: Nhóm theo tọa độ X (cột) để chống vỡ layout CV 2 cột
+                text_blocks.sort(key=lambda b: (round(b[0] / 200), b[1]))
                 full_text += "\n".join([b[4] for b in text_blocks]) + "\n"
 
             if not full_text.strip(): return []
@@ -147,7 +147,7 @@ class CVDataIngestor:
         return results
 
 # =====================================================================
-# TẦNG 2: TRÍCH XUẤT THÔNG TIN (EXTRACTION) - ĐÃ HỢP NHẤT VÀ TỐI ƯU
+# TẦNG 2: TRÍCH XUẤT THÔNG TIN (EXTRACTION)
 # =====================================================================
 def extract_contact_and_labeled_fields(text: str) -> Dict[str, Any]:
     result = {
@@ -160,9 +160,10 @@ def extract_contact_and_labeled_fields(text: str) -> Dict[str, Any]:
     email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', text)
     if email_match: result["email"] = email_match.group(0).rstrip('.')
 
-    # Đã sửa lại Regex bắt số điện thoại tốt hơn cho Việt Nam
-    phone_match = re.search(r'(?:\+84|0)(?:[3|5|7|8|9])(?:\d{8}|\d{3}\s\d{2}\s\d{3}|\d{4}\s\d{4})', text)
-    if phone_match: result["phone"] = re.sub(r'[^\d+]', '', phone_match.group(0))
+    # CẢI TIẾN: Bắt số điện thoại quốc tế mở rộng (Mỹ, Anh, VN...)
+    phone_match = re.search(r'(?:(?:\+|00)\d{1,3}[\s\-\.]?)?(?:\(?\d{2,4}\)?[\s\-\.]?)?[\d\-\.\s]{7,15}\b', text)
+    if phone_match: 
+        result["phone"] = re.sub(r'[^\d\+]', '', phone_match.group(0))
 
     github_match = re.search(r'(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9_\-]+)', text, re.IGNORECASE)
     if github_match: result["github"] = f"https://github.com/{github_match.group(1)}"
@@ -182,14 +183,11 @@ def extract_contact_and_labeled_fields(text: str) -> Dict[str, Any]:
     return result
 
 class SkillExtractor:
-    """Đã được tiêm siêu từ điển IT Taxonomy"""
     def __init__(self, skills_path: str = None):
         self.nlp = spacy.blank("en")
         self.matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
         
-        # TỪ ĐIỂN MỞ RỘNG (Gắn thêm não cho bot)
         self.taxonomy = {
-            # Ngôn ngữ
             "Python": ["python", "python3", "py"],
             "JavaScript": ["javascript", "js", "es6", "vanilla js"],
             "TypeScript": ["typescript", "ts"],
@@ -199,28 +197,20 @@ class SkillExtractor:
             "PHP": ["php", "laravel"],
             "Go": ["go", "golang"],
             "Ruby": ["ruby", "ruby on rails"],
-            
-            # Data & AI
             "Machine Learning": ["machine learning", "ml", "học máy"],
             "Deep Learning": ["deep learning", "dl", "neural networks"],
             "Data Analysis": ["data analysis", "data analytics", "phân tích dữ liệu"],
             "Pandas": ["pandas"], "NumPy": ["numpy"], 
             "Scikit-learn": ["scikit-learn", "sklearn"],
             "TensorFlow": ["tensorflow", "tf"], "PyTorch": ["pytorch"],
-            
-            # Database
             "SQL": ["sql", "mysql", "postgresql", "t-sql", "pl/sql", "sql server"],
             "NoSQL": ["nosql", "mongodb", "cassandra", "redis", "dynamodb"],
-            
-            # Front-end & Mobile
             "React": ["react", "reactjs", "react.js"],
             "React Native": ["react native"],
             "Angular": ["angular", "angularjs"],
             "Vue": ["vue", "vuejs", "vue.js"],
             "HTML/CSS": ["html", "html5", "css", "css3", "tailwind", "bootstrap"],
             "Flutter": ["flutter", "dart"],
-            
-            # Back-end, Cloud & DevOps
             "Node.js": ["node.js", "nodejs", "node"],
             "AWS": ["aws", "amazon web services", "ec2", "s3"],
             "Azure": ["azure", "microsoft azure"],
@@ -231,7 +221,6 @@ class SkillExtractor:
             "CI/CD": ["ci/cd", "jenkins", "github actions", "gitlab ci"]
         }
         
-        # Vẫn giữ logic ưu tiên load mô hình AI (.pkl) nếu ông có truyền
         if skills_path and Path(skills_path).exists():
             try:
                 mlb = joblib.load(skills_path)
@@ -240,104 +229,142 @@ class SkillExtractor:
                 self.matcher.add("skills", patterns)
                 return
             except Exception:
-                print("Lỗi load file .pkl, tự động lùi về dùng Taxonomy từ điển.")
                 pass
         
-        # Nạp bộ từ điển khổng lồ ở trên vào não spaCy
         for canonical_name, aliases in self.taxonomy.items():
             patterns = [self.nlp.make_doc(text) for text in aliases]
             self.matcher.add(canonical_name, patterns)
 
     def extract_skills(self, text: str) -> List[str]:
         if not text: return []
-        
-        # Mẹo: Thêm bước làm sạch dấu câu để chống dính chữ trước khi quét
         clean_text = re.sub(r'[,|/\\;:]', ' ', text)
-        
         results = set()
         doc = self.nlp(clean_text)
         for match_id, start, end in self.matcher(doc):
             string_id = self.nlp.vocab.strings[match_id]
-            # Nếu string_id có trong vocab (tức là key của từ điển), lấy key chuẩn.
-            # Nếu không, lấy chuỗi raw bắt được.
             if string_id in self.nlp.vocab.strings:
                 results.add(string_id)
             else:
                 results.add(doc[start:end].text)
-                
         return sorted(list(results))
 
 class ExperienceExtractor:
     def __init__(self):
         self.current_year = datetime.now().year
-        self.exp_header = re.compile(r'(?:WORK\s+EXPERIENCE|KINH\s*NGHIỆM)\b', re.IGNORECASE)
-        self.next_header = re.compile(r'(?:EDUCATION|HỌC\s*VẤN|SKILLS?|KỸ\s*NĂNG)\b', re.IGNORECASE)
+        # Mở rộng nhận diện tiêu đề để chống bỏ sót
+        self.exp_header = re.compile(r'(?:WORK\s+EXPERIENCE|EXPERIENCE|KINH\s*NGHIỆM\s*LÀM\s*VIỆC|KINH\s*NGHIỆM|LỊCH\s*SỬ\s*LÀM\s*VIỆC|EMPLOYMENT)\b', re.IGNORECASE)
+        # Các tiêu đề dễ xuất hiện ngay sau phần Kinh nghiệm để chặn lại
+        self.next_header = re.compile(r'(?:EDUCATION|HỌC\s*VẤN|SKILLS?|KỸ\s*NĂNG|PROJECTS?|DỰ\s*ÁN|CERTIFICATES?|CHỨNG\s*CHỈ)\b', re.IGNORECASE)
 
-    def _classify_level(self, years: float, text: str) -> str:
+    def _classify_level(self, years: int, text: str) -> str:
         text_lower = text.lower()
-        if any(w in text_lower for w in ["senior", "lead"]): return "Senior"
+        if any(w in text_lower for w in ["senior", "lead", "manager"]): return "Senior"
         if any(w in text_lower for w in ["junior"]): return "Junior"
         if any(w in text_lower for w in ["intern", "fresher"]): return "Intern/Fresher"
-        
-        if years < 1.0: return "Intern/Fresher"
-        elif 1.0 <= years < 3.0: return "Junior"
-        elif 3.0 <= years < 5.0: return "Mid-Level"
+
+        if years < 1: return "Intern/Fresher"
+        elif 1 <= years < 3: return "Junior"
+        elif 3 <= years < 5: return "Mid-Level"
         return "Senior"
 
     def extract_experience(self, text: str, raw_exp_str: str = None) -> Dict[str, Any]:
-        target_text = raw_exp_str or text
-        
-        # Thuật toán Merge Intervals
-        date_ranges = re.findall(r'\b(20\d{2})\s*[-–—tođến]+\s*(20\d{2}|present|nay|hiện\s*tại)\b', target_text, re.IGNORECASE)
-        total_years = 0.0
-        
+        now = datetime.now()
+        current_year = now.year
+        current_month = now.month
+
+        # SỬA LỖI 1: Bắt số năm trực tiếp thật chặt chẽ (Chỉ bắt chữ "years of experience")
+        search_area = (raw_exp_str + " \n " + text) if raw_exp_str else text
+        year_explicit = re.search(r'(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?|năm)(?:\s*(?:of\s*)?(?:experience|kinh\s*nghiệm))', search_area, re.IGNORECASE)
+        if year_explicit:
+            yrs = int(round(float(year_explicit.group(1))))
+            return {"years": yrs, "level": self._classify_level(yrs, search_area)}
+
+        # SỬA LỖI 2: CÔ LẬP CHÍNH XÁC VÙNG KINH NGHIỆM ĐỂ QUÉT NGÀY THÁNG
+        exp_section = text
+        exp_match = self.exp_header.search(text)
+        if exp_match:
+            start_idx = exp_match.end()
+            next_match = self.next_header.search(text[start_idx:])
+            if next_match:
+                # Nếu thấy section tiếp theo (VD: Education), chặt đứt văn bản tại đó
+                exp_section = text[start_idx : start_idx + next_match.start()]
+            else:
+                exp_section = text[start_idx:]
+
+        # Lúc này exp_section chỉ còn thuần túy lịch sử làm việc, không sợ lẫn ngày ra trường
+        date_ranges = re.findall(
+            r'\b(?:(\d{1,2})[/.\-])?(20\d{2})\s*[-–—tođến]+\s*(?:(\d{1,2})[/.\-])?(20\d{2}|present|nay|hiện\s*tại)\b',
+            exp_section, re.IGNORECASE
+        )
+
         if date_ranges:
             intervals = []
-            for start, end in date_ranges:
-                start_y = int(start)
-                end_y = self.current_year if any(k in end.lower() for k in ["present", "nay", "hiện"]) else int(end)
-                if start_y <= end_y: intervals.append([start_y, end_y])
-            
+            for start_m, start_y, end_m, end_y_str in date_ranges:
+                s_y = int(start_y)
+                s_m = int(start_m) if start_m else 1
+
+                if any(k in end_y_str.lower() for k in ["present", "nay", "hiện"]):
+                    e_y = current_year
+                    e_m = current_month
+                else:
+                    e_y = int(end_y_str)
+                    e_m = int(end_m) if end_m else 12
+
+                start_abs = s_y * 12 + s_m
+                end_abs = e_y * 12 + e_m
+
+                if start_abs <= end_abs:
+                    intervals.append([start_abs, end_abs])
+
             if intervals:
                 intervals.sort(key=lambda x: x[0])
                 merged = [intervals[0]]
                 for current in intervals[1:]:
                     previous = merged[-1]
-                    if current[0] <= previous[1]: previous[1] = max(previous[1], current[1])
-                    else: merged.append(current)
-                
-                total_years = float(sum(end - start for start, end in merged))
-                return {"years": total_years, "level": self._classify_level(total_years, target_text)}
-                
-        # Fallback regex số năm
-        year_explicit = re.search(r'(\d+(?:\.\d+)?)\s*(?:\+)?\s*(?:years?|yrs?|năm)', target_text, re.IGNORECASE)
-        if year_explicit:
-            yrs = float(year_explicit.group(1))
-            return {"years": yrs, "level": self._classify_level(yrs, target_text)}
+                    if current[0] <= previous[1]:
+                        previous[1] = max(previous[1], current[1])
+                    else:
+                        merged.append(current)
 
-        return {"years": 0.0, "level": self._classify_level(0.0, target_text)}
+                # SỬA LỖI 3: Cộng 1 vào khoảng tháng (Inclusive Month) 
+                total_months = sum((end - start + 1) for start, end in merged)
+                total_years = int(round(total_months / 12.0))
+                return {"years": total_years, "level": self._classify_level(total_years, exp_section)}
+
+        return {"years": 0, "level": self._classify_level(0, exp_section)}
 
 # =====================================================================
-# TẦNG 3: ĐIỀU PHỐI (ORCHESTRATION) - ĐÃ ĐỔI SANG MULTIPROCESSING
+# TẦNG 3: ĐIỀU PHỐI (ORCHESTRATION) - MULTIPROCESSING
 # =====================================================================
+# CẢI TIẾN: Biến toàn cục để khởi tạo mô hình AI trong từng tiến trình con
+worker_skill_extractor = None
+worker_exp_extractor = None
+
+def init_worker():
+    global worker_skill_extractor, worker_exp_extractor
+    worker_skill_extractor = SkillExtractor()
+    worker_exp_extractor = ExperienceExtractor()
+
+def process_single_cv_task(cv_data: Tuple[str, str]) -> dict:
+    cv_id, text = cv_data
+    contact_info = extract_contact_and_labeled_fields(text)
+    
+    # Sử dụng object đã được load sẵn trong Worker
+    skills_list = worker_skill_extractor.extract_skills(text)
+    experience = worker_exp_extractor.extract_experience(text, contact_info.get("raw_experience_str"))
+    
+    # CẢI TIẾN: Ép format output DataFrame gồm 4 cột
+    return {
+        "id": cv_id,
+        "danh sách skills": ", ".join(skills_list) if skills_list else "",
+        "năm kinh nghiệm": experience.get("years"),
+        "vị trí việc làm": experience.get("level")
+    }
+
 class CVParserPipeline:
     def __init__(self):
         self.ingestor = CVDataIngestor()
-        self.skill_extractor = SkillExtractor()
-        self.exp_extractor = ExperienceExtractor()
-        
-    def process_single_cv(self, cv_data: Tuple[str, str]) -> dict:
-        cv_id, text = cv_data
-        contact_info = extract_contact_and_labeled_fields(text)
-        skills_list = self.skill_extractor.extract_skills(text)
-        experience = self.exp_extractor.extract_experience(text, contact_info.get("raw_experience_str"))
-        
-        # CHỈNH SỬA: Chỉ trả về đúng 3 trường dữ liệu được yêu cầu
-        return {
-            "skill": skills_list,
-            "năm kinh nghiệm": experience.get("years"),
-            "level công việc": experience.get("level")
-        }
+        # Không khởi tạo Extractor ở đây để tránh crash RAM
 
     def run(self, input_path: str) -> pd.DataFrame:
         print(f"Đang nạp dữ liệu từ: {input_path}...")
@@ -350,9 +377,9 @@ class CVParserPipeline:
         print(f"Đã nạp {len(raw_cvs)} CV. Ép xung đa tiến trình (ProcessPool)...")
         final_results = []
 
-        # ĐÃ SỬA: Thay ThreadPool bằng ProcessPool để giải phóng sức mạnh CPU
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            futures = [executor.submit(self.process_single_cv, data) for data in raw_cvs]
+        # CẢI TIẾN: Truyền initializer chống nghẽn bộ nhớ
+        with concurrent.futures.ProcessPoolExecutor(initializer=init_worker) as executor:
+            futures = [executor.submit(process_single_cv_task, data) for data in raw_cvs]
             for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
                 try:
                     final_results.append(future.result())
@@ -371,16 +398,19 @@ class CVParserPipeline:
 # KHỐI CHẠY KIỂM THỬ THỰC TẾ (RUN SCRIPT)
 # =====================================================================
 if __name__ == "__main__":
-    # ĐỔI ĐƯỜNG DẪN Ở ĐÂY
-    INPUT_FOLDER = r"dán đường dẫn"
+    INPUT_FOLDER = r"/content/drive/MyDrive/HACKATHON raw/Dũng/20_cv_doi_chieu_individual_pdfs"
     
     if os.path.exists(INPUT_FOLDER):
         pipeline = CVParserPipeline()
         df_cv = pipeline.run(INPUT_FOLDER)
         
-        # CHỈNH SỬA: Bỏ xuất CSV, hiển thị thẳng DataFrame trên RAM
         if not df_cv.empty:
+            # CẤU HÌNH PANDAS ĐỂ HIỂN THỊ FULL BẢNG
+            pd.set_option('display.max_columns', None)
+            pd.set_option('display.max_rows', None)  # Bật hiển thị toàn bộ số dòng
+            pd.set_option('display.width', 1000)
+            
             print("\n✅ Đã tạo DataFrame thành công trên RAM!")
-            print(df_cv.head())
+            print(df_cv)  # Bỏ .head() để in ra toàn bộ
     else:
-        print(f" Đường dẫn không tồn tại: {INPUT_FOLDER}")
+        print(f"Đường dẫn không tồn tại: {INPUT_FOLDER}")
