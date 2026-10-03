@@ -74,7 +74,7 @@ def main():
             st.subheader("Tải CV của bạn")
             st.caption("Định dạng: .pdf, .docx - Giới hạn: 10 MB - Kéo thả hoặc bấm chọn")
             up = st.file_uploader("Chọn file CV", type=["pdf", "docx"], label_visibility="collapsed")
-            if st.button("Xóa CV — quay về Locked", use_container_width=True):
+            if st.button("Xóa CV - quay về Locked", use_container_width=True):
                 st.session_state.pop("cv_done", None)
                 st.session_state.pop("cv_name", None)
                 st.rerun()
@@ -89,17 +89,18 @@ def main():
                 for p in range(0, 101, 20):
                     bar.progress(p)
                     time.sleep(0.15)
-                text = read_cv_text(up)
+                text = cv_reader(up)
                 s.update(label="Trích xuất hoàn tất.", state="complete")
-            if text.strip() == "":
-                st.error("Không thể đọc nội dung, vui lòng tải tệp PDF tiêu chuẩn (file scan ảnh không đọc được ký tự — OCR failed).")
-            else:
-                st.success(f"Đã phân tích: {up.name} · {up.size/1024/1024:.1f} MB")
-                st.session_state["cv_done"] = True
-                st.session_state["cv_name"] = up.name
-                st.session_state["cv_size"] = up.size
-                st.session_state["cv_text"] = text
-                cv_ready = True
+            # more placeholder
+            # if text.strip() == "":
+            #     st.error("Không thể đọc nội dung, vui lòng tải tệp PDF tiêu chuẩn (file scan ảnh không đọc được ký tự — OCR failed).")
+            # else:
+            #     st.success(f"Đã phân tích: {up.name} · {up.size/1024/1024:.1f} MB")
+            #     st.session_state["cv_done"] = True
+            #     st.session_state["cv_name"] = up.name
+            #     st.session_state["cv_size"] = up.size
+            #     st.session_state["cv_text"] = text
+            #     cv_ready = True
         elif st.session_state.get("cv_done"):
             cv_ready = True
 
