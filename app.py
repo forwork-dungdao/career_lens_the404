@@ -72,7 +72,7 @@ def main():
         with right2:
             st.subheader("Tải CV của bạn")
             st.caption("Định dạng: .pdf, .docx - Giới hạn: 10 MB - Kéo thả hoặc bấm chọn")
-            up = st.file_uploader("Chọn file CV", type=["pdf", "docx"], label_visibility="collapsed")
+            up = st.file_uploader("Chọn file CV", type=["pdf", "docx"], label_visibility="collapsed", max_upload_size=10)
             if st.button("Xóa CV — quay về Locked", use_container_width=True):
                 st.session_state.pop("cv_done", None)
                 st.session_state.pop("cv_name", None)
