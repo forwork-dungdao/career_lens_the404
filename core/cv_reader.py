@@ -310,6 +310,3 @@ class CVParserPipeline:
         
         print(f"🚀 XONG ! Đã return DataFrame với shape: {df_final.shape}")
         return df_final
-
-    #Module 3: Bóc tách Thông tin Học vấn & Tên Trường Đại học (Education & University Extraction).
-
