@@ -1,6 +1,5 @@
 import os
 import tempfile
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -19,53 +18,80 @@ def main():
     st.logo("🎯")
 
     def dashboard():
-        st.title("📊 Dashboard")
-        st.write("Placeholder")
+        st.title("📊 Salary Dashboard")
+        st.caption("Sample data · illustrative salary and listing figures (USD per month)")
 
-        # Example data
-        df_bar = pd.DataFrame({
-            "Category": ["A", "B", "C", "D", "E"],
-            "Value": [120, 180, 90, 220, 160],
-        })
+        df = pd.DataFrame([
+            {"Month": "2026-01", "Role": "Data Analyst", "Salary": 4200, "Listings": 18},
+            {"Month": "2026-01", "Role": "Software Engineer", "Salary": 6100, "Listings": 25},
+            {"Month": "2026-01", "Role": "UX Designer", "Salary": 4800, "Listings": 12},
+            {"Month": "2026-02", "Role": "Data Analyst", "Salary": 4350, "Listings": 20},
+            {"Month": "2026-02", "Role": "Software Engineer", "Salary": 6300, "Listings": 28},
+            {"Month": "2026-02", "Role": "UX Designer", "Salary": 4950, "Listings": 14},
+            {"Month": "2026-03", "Role": "Data Analyst", "Salary": 4500, "Listings": 22},
+            {"Month": "2026-03", "Role": "Software Engineer", "Salary": 6500, "Listings": 30},
+            {"Month": "2026-03", "Role": "UX Designer", "Salary": 5100, "Listings": 16},
+            {"Month": "2026-04", "Role": "Data Analyst", "Salary": 4650, "Listings": 24},
+            {"Month": "2026-04", "Role": "Software Engineer", "Salary": 6700, "Listings": 32},
+            {"Month": "2026-04", "Role": "UX Designer", "Salary": 5250, "Listings": 18},
+        ])
 
-        df_donut = pd.DataFrame({
-            "Category": ["Desktop", "Mobile", "Tablet"],
-            "Value": [55, 35, 10],
-        })
+        total_listings = df["Listings"].sum()
+        average_salary = (df["Salary"] * df["Listings"]).sum() / total_listings
+        highest_salary = df["Salary"].max()
 
-        # Left / Right layout
-        col1, col2 = st.columns(2)
+        listings_card, average_card, highest_card = st.columns(3)
+        listings_card.metric("Total listings", f"{total_listings:,}")
+        average_card.metric("Average salary", f"${average_salary:,.0f} / month")
+        highest_card.metric("Highest salary", f"${highest_salary:,.0f} / month")
 
-        # Bar chart - Left
-        with col1:
-            st.subheader("Sales by Category")
+        weighted_df = df.assign(WeightedSalary=df["Salary"] * df["Listings"])
+        salary_by_role = weighted_df.groupby("Role", as_index=False)[
+            ["WeightedSalary", "Listings"]
+        ].sum()
+        salary_by_role["AverageSalary"] = (
+            salary_by_role["WeightedSalary"] / salary_by_role["Listings"]
+        )
 
+        salary_by_month = weighted_df.groupby("Month", as_index=False)[
+            ["WeightedSalary", "Listings"]
+        ].sum().sort_values("Month")
+        salary_by_month["AverageSalary"] = (
+            salary_by_month["WeightedSalary"] / salary_by_month["Listings"]
+        )
+
+        listings_by_role = df.groupby("Role", as_index=False)["Listings"].sum()
+
+        bar_col, line_col = st.columns(2)
+        with bar_col:
+            st.subheader("Average salary by role")
             fig_bar = px.bar(
-                df_bar,
-                x="Category",
-                y="Value",
+                salary_by_role,
+                x="Role",
+                y="AverageSalary",
+                labels={"AverageSalary": "Average salary (USD/month)"},
             )
+            st.plotly_chart(fig_bar, width="stretch")
 
-            st.plotly_chart(
-                fig_bar,
-                width='stretch',
+        with line_col:
+            st.subheader("Average salary by month")
+            fig_line = px.line(
+                salary_by_month,
+                x="Month",
+                y="AverageSalary",
+                markers=True,
+                labels={"AverageSalary": "Average salary (USD/month)"},
             )
+            st.plotly_chart(fig_line, width="stretch")
 
-        # Donut chart - Right
-        with col2:
-            st.subheader("Device Distribution")
-
-            fig_donut = px.pie(
-                df_donut,
-                names="Category",
-                values="Value",
-                hole=0.6,
-            )
-
-            st.plotly_chart(
-                fig_donut,
-                width='stretch',
-            )
+        st.subheader("Listings by role")
+        fig_donut = px.pie(
+            listings_by_role,
+            names="Role",
+            values="Listings",
+            hole=0.6,
+        )
+        st.plotly_chart(fig_donut, width="stretch")
 
 
     def salary_predictor():
