@@ -1,4 +1,4 @@
-import datetime
+
 import os
 import glob
 import re
@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import List, Tuple, Dict, Any, Set, Optional
 import joblib
 from pathlib import Path
-from typing import List, Optional, Tuple, Dict, Any, Set
 import concurrent.futures
 import pymupdf  as fitz
 import pandas as pd
@@ -16,6 +15,53 @@ from spacy.matcher import PhraseMatcher
 import docx
 
 class CVDataIngestor:
+    def run(self, input_path: str) -> List[Tuple[str, str]]:
+        """
+        Hàm đầu vào (Entry point) của CVDataIngestor.
+        Nhận vào đường dẫn file hoặc thư mục, tự động nhận diện định dạng và phân luồng xử lý.
+        """
+        raw_data: List[Tuple[str, str]] = []
+        
+        # 1. NẾU ĐẦU VÀO LÀ MỘT THƯ MỤC (FOLDER)
+        if os.path.isdir(input_path):
+            # Lấy toàn bộ file trong thư mục
+            all_files = glob.glob(os.path.join(input_path, "*"))
+            for f in all_files:
+                # Bỏ qua nếu nó là thư mục con, chỉ quét file
+                if os.path.isfile(f):
+                    # Đệ quy: Gọi lại chính hàm run cho từng file
+                    raw_data.extend(self.run(f)) 
+            
+            # Trả về kết quả sau khi đã quét sạch cả thư mục
+            return [(cand_id, self.clean_text(raw)) for cand_id, raw in raw_data if raw.strip()]
+
+        # 2. NẾU ĐẦU VÀO LÀ MỘT FILE CỤ THỂ
+        ext = os.path.splitext(input_path)[1].lower()
+
+        if ext == ".pdf":
+            raw_data.extend(self._read_pdf(input_path))
+            
+        elif ext == ".csv":
+            raw_data.extend(self._read_csv(input_path))
+            
+        elif ext in [".docx", ".doc"]:
+            raw_data.extend(self._read_docx(input_path))
+            
+        elif ext in [".txt", ".text"]:
+            try:
+                with open(input_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
+                if content.strip():
+                    raw_data.extend(self._detect_and_split_records(content, os.path.basename(input_path)))
+            except Exception as e:
+                print(f"⚠️ Lỗi đọc file txt {input_path}: {e}")
+            
+        else:
+            print(f"⚠️ Bỏ qua file '{os.path.basename(input_path)}': Định dạng '{ext}' chưa được hỗ trợ.")
+
+        # 3. LÀM SẠCH VÀ TRẢ VỀ DỮ LIỆU
+        return [(cand_id, self.clean_text(raw)) for cand_id, raw in raw_data if raw.strip()]
+
     def __init__(self, text_col: str = None, id_col: str = None):
         self.text_col = text_col
         self.id_col = id_col
