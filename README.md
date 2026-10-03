@@ -1,4 +1,4 @@
-# TechSkill Radar
+# Career Lens
 
 Ứng dụng phân tích dữ liệu tuyển dụng và khám phá xu hướng kỹ năng công nghệ. Dự án được xây dựng bằng Python và Streamlit, sử dụng dữ liệu việc làm trong `data/job.csv` để hiển thị các biểu đồ về vị trí, cấp độ, địa điểm và mức lương.
 
