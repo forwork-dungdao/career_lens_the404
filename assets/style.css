@@ -1,0 +1,29 @@
+/* Tùy chỉnh CSS cho giao diện Streamlit hiện đại */
+div[data-testid="stContainer"] {
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    transition: box-shadow 0.3s ease;
+}
+
+div[data-testid="stContainer"]:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+}
+
+div[data-testid="stMetricValue"] {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+/* Các tuỳ chỉnh sidebar hoặc nền nếu cần */
+.stApp {
+    background-color: #f8fafc;
+}
+
+h1, h2, h3 {
+    font-family: 'Inter', sans-serif;
+    color: #1e293b;
+}

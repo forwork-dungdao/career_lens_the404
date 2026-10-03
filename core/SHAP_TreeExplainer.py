@@ -31,30 +31,24 @@ def _find_root() -> Path:
     return p.parent
 
 
-<<<<<<< HEAD
 # --- Duong dan dung chung cho ca file ---
 ROOT = _find_root()          # vd: .../career_lens_the404/career_lens_the404
 PICKLE_DIR = ROOT / "pickle"  # noi chua 3 file model/encoder
 DATA_DIR = ROOT / "data"      # noi chua job.csv (du lieu thi truong)
-=======
 ROOT = _find_root()
 PICKLE_DIR = ROOT / "models"
 DATA_DIR = ROOT / "data"
->>>>>>> d286ad5 (update)
 
 # Anh xa ten logic -> ten file thuc te tren dia.
 # Phai khop tuyet doi voi file trong thu muc pickle/,
 # neu sai 1 ky tu se roi vao FileNotFoundError o ham load_pickle.
 PICKLE_FILES = {
-<<<<<<< HEAD
     "gbm_model": "gbm_model._pkl",
     "mlb": "mlb._pkl",
     "feature_names": "feature_names._pkl",
-=======
     "gbm_model": "gbm_model.pkl",
     "mlb": "mlb.pkl",
     "feature_names": "feature_names.pkl",
->>>>>>> d286ad5 (update)
 }
 
 
