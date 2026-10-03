@@ -9,7 +9,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import json
 
-
 def _find_root() -> Path:
     """Tim thu muc goc cua project (thu muc chua `pickle/` va `data/`).
 
