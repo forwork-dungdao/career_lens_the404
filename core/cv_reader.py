@@ -180,4 +180,61 @@ class CVDataIngestor:
                 print(f"⚠️ lỗi txt: {e}")
         return [(cand_id, self.clean_text(raw)) for cand_id, raw in raw_data if raw.strip()]
 
+#Module 1 : Thiết kế regex
+
+def extract_contact_and_labeled_fields(text: str) -> Dict[str, Any]:
+    result: Dict[str, Any] = {
+        "name": None, "email": None, "phone": None, "github": None,
+        "linkedin": None, "age": None, "university": None,
+        "raw_position": None, "raw_experience_str": None,
+    }
+    if not text: return result
+
+    email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', text)
+    if email_match: result["email"] = email_match.group(0).rstrip('.')
+
+    # Regex bao quát SĐT quốc tế (Hỗ trợ +, dấu cách, dấu ngoặc)
+    phone_match = re.search(r'(?:\+?\d{1,4}[\s\.-]?)?(?:\(?\d{2,4}\)?[\s\.-]?)?\d{3,4}[\s\.-]?\d{3,4}', text)
+    if phone_match: 
+        # Lọc sạch chỉ để lại số và dấu +
+        clean_phone = re.sub(r'[^\d+]', '', phone_match.group(0))
+        # Ràng buộc độ dài hợp lý của SĐT (9-15 số)
+        if 9 <= len(clean_phone) <= 15:
+            result["phone"] = clean_phone
+
+    github_match = re.search(r'(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9_\-]+)', text, re.IGNORECASE)
+    if github_match: result["github"] = f"https://github.com/{github_match.group(1)}"
+
+    linkedin_match = re.search(r'(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([a-zA-Z0-9_\-]+)', text, re.IGNORECASE)
+    if linkedin_match: result["linkedin"] = f"https://www.linkedin.com/in/{linkedin_match.group(1)}"
+
+    kv_pattern = re.compile(
+        r'(?i)(?:^|\n)\s*(Name|Age|University|Position|Experience|Skills|Họ\s*và\s*tên|Tuổi|Trường)\s*[:\-]\s*(.+)'
+    )
+    labeled_data = {}
+    for match in kv_pattern.finditer(text):
+        labeled_data[match.group(1).lower().strip()] = match.group(2).strip()
+
+    result["name"] = labeled_data.get("name") or labeled_data.get("họ và tên")
+
+    raw_age = labeled_data.get("age") or labeled_data.get("tuổi")
+    if raw_age:
+        age_num = re.search(r'\d+', raw_age)
+        if age_num: result["age"] = int(age_num.group(0))
+
+    result["university"] = labeled_data.get("university") or labeled_data.get("trường")
+    result["raw_position"] = labeled_data.get("position")
+    result["raw_experience_str"] = labeled_data.get("experience")
+
+    if not result["name"]:
+        non_empty_lines = [line.strip() for line in text.splitlines() if line.strip()]
+        blacklist_words = ["cv", "resume", "curriculum", "intern", "engineer", "developer", "page"]
+        for line in non_empty_lines[:3]:
+            words = line.split()
+            if 2 <= len(words) <= 5 and not re.search(r'[@\d/:#]', line):
+                if not any(bw in line.lower() for bw in blacklist_words):
+                    result["name"] = line
+                    break
+    return result
+
 
