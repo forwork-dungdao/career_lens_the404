@@ -183,18 +183,56 @@ def extract_contact_and_labeled_fields(text: str) -> Dict[str, Any]:
     return result
 
 class SkillExtractor:
-    """Hợp nhất Module load kỹ năng"""
+    """Đã được tiêm siêu từ điển IT Taxonomy"""
     def __init__(self, skills_path: str = None):
         self.nlp = spacy.blank("en")
         self.matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
         
+        # TỪ ĐIỂN MỞ RỘNG (Gắn thêm não cho bot)
         self.taxonomy = {
-            "Python": ["python", "py"], "SQL": ["sql", "mysql", "postgresql"],
+            # Ngôn ngữ
+            "Python": ["python", "python3", "py"],
+            "JavaScript": ["javascript", "js", "es6", "vanilla js"],
+            "TypeScript": ["typescript", "ts"],
+            "Java": ["java", "core java", "j2ee", "spring boot"],
+            "C#": ["c#", "csharp", ".net", "asp.net"],
+            "C++": ["c++", "cpp", "c/c++"],
+            "PHP": ["php", "laravel"],
+            "Go": ["go", "golang"],
+            "Ruby": ["ruby", "ruby on rails"],
+            
+            # Data & AI
             "Machine Learning": ["machine learning", "ml", "học máy"],
-            "C++": ["c++", "cpp"], "Java": ["java"], "Pandas": ["pandas"]
+            "Deep Learning": ["deep learning", "dl", "neural networks"],
+            "Data Analysis": ["data analysis", "data analytics", "phân tích dữ liệu"],
+            "Pandas": ["pandas"], "NumPy": ["numpy"], 
+            "Scikit-learn": ["scikit-learn", "sklearn"],
+            "TensorFlow": ["tensorflow", "tf"], "PyTorch": ["pytorch"],
+            
+            # Database
+            "SQL": ["sql", "mysql", "postgresql", "t-sql", "pl/sql", "sql server"],
+            "NoSQL": ["nosql", "mongodb", "cassandra", "redis", "dynamodb"],
+            
+            # Front-end & Mobile
+            "React": ["react", "reactjs", "react.js"],
+            "React Native": ["react native"],
+            "Angular": ["angular", "angularjs"],
+            "Vue": ["vue", "vuejs", "vue.js"],
+            "HTML/CSS": ["html", "html5", "css", "css3", "tailwind", "bootstrap"],
+            "Flutter": ["flutter", "dart"],
+            
+            # Back-end, Cloud & DevOps
+            "Node.js": ["node.js", "nodejs", "node"],
+            "AWS": ["aws", "amazon web services", "ec2", "s3"],
+            "Azure": ["azure", "microsoft azure"],
+            "GCP": ["gcp", "google cloud"],
+            "Docker": ["docker", "containerization"],
+            "Kubernetes": ["kubernetes", "k8s"],
+            "Git": ["git", "github", "gitlab", "bitbucket"],
+            "CI/CD": ["ci/cd", "jenkins", "github actions", "gitlab ci"]
         }
         
-        # Ưu tiên load từ model joblib nếu tồn tại
+        # Vẫn giữ logic ưu tiên load mô hình AI (.pkl) nếu ông có truyền
         if skills_path and Path(skills_path).exists():
             try:
                 mlb = joblib.load(skills_path)
@@ -203,22 +241,32 @@ class SkillExtractor:
                 self.matcher.add("skills", patterns)
                 return
             except Exception:
+                print("Lỗi load file .pkl, tự động lùi về dùng Taxonomy từ điển.")
                 pass
         
-        # Nếu không có file pkl, xài từ điển Taxonomy mặc định
+        # Nạp bộ từ điển khổng lồ ở trên vào não spaCy
         for canonical_name, aliases in self.taxonomy.items():
             patterns = [self.nlp.make_doc(text) for text in aliases]
             self.matcher.add(canonical_name, patterns)
 
     def extract_skills(self, text: str) -> List[str]:
         if not text: return []
+        
+        # Mẹo: Thêm bước làm sạch dấu câu để chống dính chữ trước khi quét
+        clean_text = re.sub(r'[,|/\\;:]', ' ', text)
+        
         results = set()
-        doc = self.nlp(text)
+        doc = self.nlp(clean_text)
         for match_id, start, end in self.matcher(doc):
             string_id = self.nlp.vocab.strings[match_id]
-            results.add(string_id) if string_id in self.nlp.vocab.strings else results.add(doc[start:end].text)
+            # Nếu string_id có trong vocab (tức là key của từ điển), lấy key chuẩn.
+            # Nếu không, lấy chuỗi raw bắt được.
+            if string_id in self.nlp.vocab.strings:
+                results.add(string_id)
+            else:
+                results.add(doc[start:end].text)
+                
         return sorted(list(results))
-
 class ExperienceExtractor:
     def __init__(self):
         self.current_year = datetime.now().year
