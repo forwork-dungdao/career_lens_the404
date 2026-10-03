@@ -1,7 +1,10 @@
+import os
+import tempfile
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
+from core.cv_reader import CVParserPipeline
 
 # Thiết lập cấu hình trang
 st.set_page_config(
@@ -72,10 +75,46 @@ def main():
         with right2:
             st.subheader("Tải CV của bạn")
             st.caption("Định dạng: .pdf, .docx - Giới hạn: 10 MB - Kéo thả hoặc bấm chọn")
-            up = st.file_uploader("Chọn file CV", type=["pdf", "docx"], label_visibility="collapsed", max_upload_size=10)
+            up = st.file_uploader(
+                "Chọn file CV",
+                type=["pdf", "docx", "csv", "txt"],
+                label_visibility="collapsed",
+            )
+            if up is not None and st.button("Phân tích CV", type="primary"):
+                if up.size > 10 * 1024 * 1024:
+                    st.error("File CV vượt quá giới hạn 10 MB.")
+                    return
+
+                suffix = "." + up.name.rsplit(".", 1)[-1].lower()
+                upload_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as file:
+                        file.write(up.getvalue())
+                        upload_path = file.name
+
+                    with st.spinner("Đang phân tích CV..."):
+                        result = CVParserPipeline().run(upload_path)
+                    if result.empty:
+                        st.warning("Không tìm thấy nội dung CV hợp lệ.")
+                    else:
+                        st.session_state["cv_result"] = result
+                except (OSError, RuntimeError, ValueError) as exc:
+                    st.error(f"Không thể phân tích CV: {exc}")
+                finally:
+                    if upload_path:
+                        try:
+                            os.unlink(upload_path)
+                        except OSError:
+                            pass
+
+            if "cv_result" in st.session_state:
+                st.subheader("Kết quả phân tích")
+                st.dataframe(st.session_state["cv_result"], use_container_width=True)
+
             if st.button("Xóa CV — quay về Locked", use_container_width=True):
                 st.session_state.pop("cv_done", None)
                 st.session_state.pop("cv_name", None)
+                st.session_state.pop("cv_result", None)
                 st.rerun()
 
 

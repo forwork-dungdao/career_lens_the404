@@ -2,8 +2,9 @@ import os
 import glob
 import re
 import unicodedata
-from datetime import datetime
-from typing import List, Tuple, Dict, Any,Set
+import joblib
+from pathlib import Path
+from typing import List, Tuple, Dict, Any, Set
 import concurrent.futures
 import fitz  
 import pandas as pd
@@ -236,25 +237,63 @@ def extract_contact_and_labeled_fields(text: str) -> Dict[str, Any]:
                     result["name"] = line
                     break
     return result
-#Module 2 : Xây dựng Taxonomy & Khớp kỹ năng (Skill Matching Engine).
+# Module 2: Xây dựng Taxonomy & Khớp kỹ năng (Skill Matching Engine).
 
-def extract_skills(self, text: str) -> List[str]:
-        """
-        Trả về trực tiếp 1 list chứa toàn bộ skills 
-        để đối chiếu với model .pkl ở Tầng 2.
-        """
-        results: Set[str] = set()
-        if not text: 
+class SkillExtractor:
+    def __init__(self, skills_path: str | None = None):
+        base_dir = Path(__file__).resolve().parent.parent
+        artifact_path = Path(skills_path) if skills_path else base_dir / "pickle" / "mlb._pkl"
+        self.nlp = spacy.blank("en")
+        self.matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
+
+        try:
+            mlb = joblib.load(artifact_path)
+            skills = [str(skill) for skill in mlb.classes_]
+        except (OSError, AttributeError, EOFError, ValueError, ImportError) as exc:
+            raise RuntimeError(f"Không thể nạp taxonomy kỹ năng từ '{artifact_path}': {exc}") from exc
+
+        patterns = [self.nlp.make_doc(skill) for skill in skills if skill.strip()]
+        if patterns:
+            self.matcher.add("skills", patterns)
+
+    def extract_skills(self, text: str) -> List[str]:
+        """Trả về các kỹ năng có trong CV theo taxonomy đã lưu."""
+        if not text:
             return []
 
+        results: Set[str] = set()
         doc = self.nlp(text)
-        for match_id, start, end in self.matcher(doc):
-            canonical_name = self.nlp.vocab.strings[match_id]
-            # Nhét thẳng vào 1 set để tự động lọc trùng
-            results.add(canonical_name)
+        for _, start, end in self.matcher(doc):
+            results.add(doc[start:end].text)
+        return sorted(results, key=str.casefold)
 
-        # Trả về 1 list đã sắp xếp theo thứ tự alphabet
-        return sorted(list(results))
+
+class ExperienceExtractor:
+    LEVEL_PATTERNS = (
+        ("Intern", r"\b(?:intern|internship|thực tập sinh)\b"),
+        ("Junior", r"\b(?:junior|fresher|entry[- ]level)\b"),
+        ("Mid", r"\b(?:mid(?:[- ]level)?|middle)\b"),
+        ("Senior", r"\b(?:senior|lead|principal|trưởng nhóm)\b"),
+        ("Manager", r"\b(?:manager|quản lý|director|head)\b"),
+    )
+    YEARS_PATTERN = re.compile(
+        r"(?<!\d)(\d+(?:[.,]\d+)?)\s*(?:\+?\s*)?(?:years?|yrs?|năm)(?:\s+of\s+experience|\s+kinh\s+nghiệm)?",
+        re.IGNORECASE,
+    )
+
+    def extract_experience(
+        self, text: str, raw_experience: str | None = None
+    ) -> Dict[str, Any]:
+        search_text = " ".join(part for part in (raw_experience, text) if part)
+        level = "Unknown"
+        for candidate, pattern in self.LEVEL_PATTERNS:
+            if re.search(pattern, search_text, re.IGNORECASE):
+                level = candidate
+                break
+
+        years_match = self.YEARS_PATTERN.search(search_text)
+        years = float(years_match.group(1).replace(",", ".")) if years_match else 0.0
+        return {"level": level, "years": years}
 
 class CVParserPipeline:
     def __init__(self):
@@ -294,7 +333,7 @@ class CVParserPipeline:
         print(f"✅ Đã nạp {len(raw_cvs)} CV. Ép xung đa luồng (Multiprocessing)...")
         final_results = []
 
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = {executor.submit(self.process_single_cv, cv_id, text): cv_id for cv_id, text in raw_cvs}
             for i, future in enumerate(concurrent.futures.as_completed(futures), start=1):
                 try:
