@@ -103,6 +103,24 @@ def main():
             #     cv_ready = True
         elif st.session_state.get("cv_done"):
             cv_ready = True
+    
+        with left2:
+            if not cv_ready and not st.session_state.get("cv_done"):
+                # before cv upload
+                st.markdown(
+                    """
+                    <div style="border:2px dashed #cbd5e1;background:#f8fafc;border-radius:16px;min-height:420px;
+                                display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 24px;color:#64748b">
+                    <div style="width:74px;height:74px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;
+                                justify-content:center;font-size:34px;margin-bottom:14px">🔒</div>
+                    <h3 style="color:#0f172a;margin:0 0 8px">Biểu đồ đang khóa</h3>
+                    <p style="max-width:420px">Vui lòng tải lên CV của bạn ở bên phải để hệ thống AI phân tích năng lực và kích hoạt biểu đồ dự báo.</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            else:
+                pass
 
 
     pages = [
