@@ -1,57 +1,188 @@
+/* ========================================
+   CAREER LENS - CUSTOM THEME
+   ======================================== */
+
+/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ---- Keyframe Animations ---- */
 @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(15px); }
+    from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Tùy chỉnh CSS cho giao diện Streamlit hiện đại */
-div[data-testid="stContainer"] {
-    animation: fadeInUp 0.7s ease-out;
-    border-radius: 16px;
-    padding: 1rem;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-    border: 1px solid var(--secondary-background-color);
-    background-color: var(--background-color);
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
-/* Hiệu ứng loading cho thanh trạng thái */
+@keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
 @keyframes pulseLoading {
     0% { opacity: 0.6; transform: scale(0.98); }
     50% { opacity: 1; transform: scale(1); }
     100% { opacity: 0.6; transform: scale(0.98); }
 }
 
-div[data-testid="stStatusWidget"] {
-    animation: pulseLoading 1.5s infinite ease-in-out;
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
 }
 
-div[data-testid="stContainer"]:hover {
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    transform: translateY(-4px);
+@keyframes countUp {
+    from { opacity: 0; transform: scale(0.5); }
+    to { opacity: 1; transform: scale(1); }
 }
 
-div[data-testid="stMetricValue"] {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-color);
-}
-
-/* Các tuỳ chỉnh sidebar hoặc nền nếu cần */
+/* ---- Global ---- */
 .stApp {
     background-color: var(--secondary-background-color);
+    font-family: 'Inter', sans-serif;
 }
 
-h1, h2, h3 {
+h1, h2, h3, h4, h5, h6 {
     font-family: 'Inter', sans-serif;
     color: var(--text-color);
 }
 
-/* Animation class cho mượt mà */
+/* ---- Container Cards ---- */
+div[data-testid="stContainer"] {
+    border-radius: 16px;
+    padding: 1rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--secondary-background-color);
+    background-color: var(--background-color);
+    transition: box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+div[data-testid="stContainer"]:hover {
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2);
+    transform: translateY(-3px);
+}
+
+/* ---- Metric Cards ---- */
+div[data-testid="stMetricValue"] {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text-color);
+    animation: countUp 0.5s ease-out;
+}
+
+div[data-testid="stMetricLabel"] {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+/* ---- Loading Status Widget ---- */
+div[data-testid="stStatusWidget"] {
+    animation: pulseLoading 1.5s infinite ease-in-out;
+}
+
+/* ---- Progress Bar ---- */
+div[data-testid="stProgress"] > div > div > div {
+    background: linear-gradient(90deg, var(--primary-color), #34d399);
+    border-radius: 8px;
+    transition: width 0.3s ease;
+}
+
+/* ---- File Uploader ---- */
+div[data-testid="stFileUploader"] {
+    border-radius: 16px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+div[data-testid="stFileUploader"]:hover {
+    box-shadow: 0 0 0 2px var(--primary-color);
+}
+
+/* ---- Selectbox / Slider ---- */
+div[data-testid="stSelectbox"] {
+    animation: fadeIn 0.5s ease-out 0.2s both;
+}
+
+div[data-testid="stSlider"] {
+    animation: fadeIn 0.5s ease-out 0.3s both;
+}
+
+/* ---- Plotly Charts ---- */
+.stPlotlyChart {
+    animation: fadeInUp 0.7s ease-out 0.3s both;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* ---- Buttons ---- */
+.stButton > button {
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15) !important;
+}
+
+.stButton > button:active {
+    transform: translateY(0px) !important;
+}
+
+/* ---- Custom fade-in class ---- */
 .fade-in {
     animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes fadeIn {
-    0% { opacity: 0; transform: translateY(20px); }
-    100% { opacity: 1; transform: translateY(0); }
+/* ---- KPI Card Styling ---- */
+.kpi-card {
+    text-align: center;
+    padding: 16px 12px;
+    animation: fadeInUp 0.5s ease-out both;
+}
+
+.kpi-card h2 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 800;
+}
+
+.kpi-card p {
+    margin: 4px 0 0 0;
+    font-size: 13px;
+    opacity: 0.7;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ---- Scrollbar Styling ---- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--secondary-background-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-color);
+    opacity: 0.5;
 }

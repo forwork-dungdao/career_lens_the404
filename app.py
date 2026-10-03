@@ -97,7 +97,8 @@ def main():
         )
 
     def dashboard():
-        st.markdown("<h1 style='text-align: center; margin-bottom: 2rem;'>DASHBOARD</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; margin-bottom: 0.5rem;'>DASHBOARD</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; opacity: 0.6; margin-bottom: 2rem;'>Phân tích tổng quan thị trường tuyển dụng IT</p>", unsafe_allow_html=True)
 
         # Đọc dữ liệu thực tế
         data_path = os.path.join(os.path.dirname(__file__), "data", "job.csv")
@@ -107,17 +108,47 @@ def main():
             st.error(f"Không thể đọc dữ liệu: {e}")
             return
 
-        # BỘ LỌC TỔNG QUÁT TƯƠNG TÁC
+        # ── KPI METRICS ROW ──
+        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+        with kpi1:
+            with st.container(border=True):
+                st.markdown(f"""<div class="kpi-card">
+                    <h2>📊 {len(df):,}</h2>
+                    <p>Tổng tin tuyển dụng</p>
+                </div>""", unsafe_allow_html=True)
+        with kpi2:
+            with st.container(border=True):
+                st.markdown(f"""<div class="kpi-card">
+                    <h2>💼 {df['job_title'].nunique()}</h2>
+                    <p>Ngành nghề</p>
+                </div>""", unsafe_allow_html=True)
+        with kpi3:
+            with st.container(border=True):
+                avg_sal = df['avg_salary'].mean()
+                st.markdown(f"""<div class="kpi-card">
+                    <h2>💰 {avg_sal:.1f}M</h2>
+                    <p>Lương trung bình</p>
+                </div>""", unsafe_allow_html=True)
+        with kpi4:
+            with st.container(border=True):
+                st.markdown(f"""<div class="kpi-card">
+                    <h2>📍 {df['location'].nunique()}</h2>
+                    <p>Khu vực</p>
+                </div>""", unsafe_allow_html=True)
+
+        # ── BỘ LỌC TỔNG QUÁT ──
         with st.container(border=True):
-            st.markdown("<h4 style='text-align: center; color: var(--primary-color); margin-bottom: 1rem;'>BỘ LỌC DỮ LIỆU TỔNG QUÁT</h4>", unsafe_allow_html=True)
-            f_col1, f_col2 = st.columns(2)
+            f_col1, f_col2, f_col3 = st.columns(3)
             with f_col1:
                 top_jobs = df['job_title'].value_counts().head(20).index.tolist()
                 job_titles = ["Tất cả các ngành"] + sorted(top_jobs)
-                selected_job = st.selectbox("Ngành nghề (Job Title):", job_titles, key="global_job_filter")
+                selected_job = st.selectbox("🏢 Ngành nghề:", job_titles, key="global_job_filter")
             with f_col2:
                 max_exp = int(df['years_experience'].max()) if pd.notna(df['years_experience'].max()) else 15
-                selected_exp = st.slider("Số năm kinh nghiệm tối đa:", min_value=0, max_value=max_exp, value=max_exp, step=1, key="global_exp_filter")
+                exp_options = list(range(1, max_exp + 1))
+                selected_exp = st.selectbox("📅 Kinh nghiệm tối đa (năm):", exp_options, index=len(exp_options) - 1, key="global_exp_filter")
+            with f_col3:
+                top_n_skills = st.selectbox("📊 Số kỹ năng hiển thị:", [5, 10, 15, 20], index=1, key="top_n_skills")
                 
         # Áp dụng bộ lọc cho DataFrame dùng chung
         if selected_job != "Tất cả các ngành":
@@ -128,22 +159,25 @@ def main():
             st.warning("Không có dữ liệu phù hợp với bộ lọc hiện tại. Hãy điều chỉnh lại.")
             return
 
-        # Layout: 2/3 (Cột trái) - 1/3 (Cột phải)
+        # Hiển thị số lượng kết quả sau lọc
+        st.caption(f"📌 Đang hiển thị **{len(df):,}** tin tuyển dụng phù hợp")
+
+        # ── CHARTS LAYOUT ──
         col_left, col_right = st.columns([2, 1])
 
-        # ---------------------------------------------
-        # Cột Trái: Biểu đồ Cột Ngang Kỹ năng (2/3 trang)
-        # ---------------------------------------------
+        # Cột Trái: Biểu đồ Cột Ngang Kỹ năng
         with col_left:
             with st.container(border=True):
-                st.markdown("<h3 style='text-align: center;'>TOP NHỮNG KỸ NĂNG PHỔ BIẾN NHẤT</h3>", unsafe_allow_html=True)
-                
-                # Bộ lọc sắp xếp
-                sort_bar = st.selectbox(
-                    "Sắp xếp theo tỷ lệ:",
-                    ["Cao đến thấp", "Thấp đến cao"],
-                    key="sort_skill"
-                )
+                title_col, sort_col = st.columns([3, 1])
+                with title_col:
+                    st.markdown("<h3 style='margin: 0;'>🏆 TOP KỸ NĂNG PHỔ BIẾN</h3>", unsafe_allow_html=True)
+                with sort_col:
+                    sort_bar = st.selectbox(
+                        "Sắp xếp:",
+                        ["Cao → Thấp", "Thấp → Cao"],
+                        key="sort_skill",
+                        label_visibility="collapsed"
+                    )
                 
                 # Tính toán dữ liệu kỹ năng dựa trên DataFrame đã lọc
                 df_skill = get_skills_by_job_title(df, "Tất cả các ngành")
@@ -151,14 +185,12 @@ def main():
                 if df_skill.empty:
                     st.info("Không có dữ liệu kỹ năng cho ngành này.")
                 else:
-                    df_top_skills = df_skill.head(10).copy()
+                    df_top_skills = df_skill.head(top_n_skills).copy()
                     
-                    if sort_bar == "Thấp đến cao":
-                        df_top_skills = df_top_skills.sort_values(by="Percentage (%)", ascending=True)
-                    else:
-                        df_top_skills = df_top_skills.sort_values(by="Percentage (%)", ascending=False)
+                    ascending = sort_bar == "Thấp → Cao"
+                    df_top_skills = df_top_skills.sort_values(by="Percentage (%)", ascending=ascending)
                         
-                    # Vẽ biểu đồ cột ngang
+                    # Vẽ biểu đồ cột ngang với animation
                     fig_bar = px.bar(
                         df_top_skills, 
                         x="Percentage (%)", 
@@ -167,49 +199,66 @@ def main():
                         color="Percentage (%)",
                         color_continuous_scale="Blues",
                         text=df_top_skills["Percentage (%)"].apply(lambda v: f"{v:.1f}%"),
-                        height=580
+                        height=580,
+                        hover_data={"Count": True, "Percentage (%)": ":.1f"}
                     )
                     fig_bar.update_layout(
                         yaxis=dict(autorange="reversed"),
                         xaxis_title="Tỷ lệ xuất hiện (%)",
-                        yaxis_title="Kỹ năng",
-                        margin=dict(t=20, b=20, l=10, r=20),
-                        coloraxis_showscale=False
+                        yaxis_title="",
+                        margin=dict(t=10, b=20, l=10, r=20),
+                        coloraxis_showscale=False,
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        font=dict(family="Inter", size=13),
                     )
-                    fig_bar.update_traces(textposition="outside")
-                    st.plotly_chart(fig_bar, width='stretch')
+                    fig_bar.update_traces(
+                        textposition="outside",
+                        marker_line_width=0,
+                        hovertemplate="<b>%{y}</b><br>Tỷ lệ: %{x:.1f}%<extra></extra>"
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
 
-        # ---------------------------------------------
-        # Cột Phải: Biểu đồ Donut & Heatmap (1/3 trang)
-        # ---------------------------------------------
+        # Cột Phải: Donut & Heatmap
         with col_right:
             # Biểu đồ Donut
             with st.container(border=True):
-                st.markdown("<h3 style='text-align: center;'>PHÂN BỐ CẤP ĐỘ</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='text-align: center; margin: 0;'>📊 PHÂN BỐ CẤP ĐỘ</h3>", unsafe_allow_html=True)
                 
-                # Xử lý dữ liệu donut
                 df_donut = df['level'].value_counts().reset_index()
                 df_donut.columns = ['Cấp độ', 'Số lượng']
                 
+                colors = ['#3b82f6', '#60a5fa', '#ef4444']
                 fig_donut = px.pie(
                     df_donut, 
                     names='Cấp độ', 
                     values='Số lượng', 
-                    hole=0.5,
-                    height=240
+                    hole=0.55,
+                    height=240,
+                    color_discrete_sequence=colors
                 )
-                fig_donut.update_layout(margin=dict(t=10, b=10, l=10, r=10))
-                st.plotly_chart(fig_donut, width='stretch')
+                fig_donut.update_layout(
+                    margin=dict(t=10, b=10, l=10, r=10),
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(family="Inter"),
+                    showlegend=True,
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5)
+                )
+                fig_donut.update_traces(
+                    textposition='outside',
+                    textinfo='percent+label',
+                    hovertemplate="<b>%{label}</b><br>Số lượng: %{value}<br>Tỷ lệ: %{percent}<extra></extra>"
+                )
+                st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False})
             
             # Biểu đồ Heatmap
             with st.container(border=True):
-                st.markdown("<h3 style='text-align: center;'>MỨC LƯƠNG TRUNG BÌNH</h3>", unsafe_allow_html=True)
+                st.markdown("<h3 style='text-align: center; margin: 0;'>🗺️ MỨC LƯƠNG TRUNG BÌNH</h3>", unsafe_allow_html=True)
                 
-                # Lấy top 5 locations phổ biến nhất
                 top_locs = df['location'].value_counts().head(5).index
                 df_heat_filter = df[df['location'].isin(top_locs)]
                 
-                # Pivot table
                 heatmap_data = df_heat_filter.pivot_table(
                     index='level', 
                     columns='location', 
@@ -221,17 +270,24 @@ def main():
                     heatmap_data, 
                     labels=dict(x="Địa điểm", y="Cấp độ", color="Lương (Tr)"),
                     aspect="auto",
-                    height=315
+                    height=315,
+                    color_continuous_scale="Blues"
                 )
                 fig_heat.update_layout(
                     margin=dict(t=10, b=10, l=10, r=10),
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(family="Inter"),
                     coloraxis_colorbar=dict(
                         title="Lương", 
-                        nticks=5
+                        nticks=5,
+                        thickness=12
                     )
                 )
-                st.plotly_chart(fig_heat, width='stretch')
-
+                fig_heat.update_traces(
+                    hovertemplate="<b>%{y} - %{x}</b><br>Lương TB: %{z:.1f} triệu<extra></extra>"
+                )
+                st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False})
 
 
     def salary_predictor():
