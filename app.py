@@ -337,81 +337,103 @@ def main():
             st.markdown('<div class="fade-in">', unsafe_allow_html=True)
             cv_data = st.session_state.get("cv_data")
             if cv_data:
-                import joblib
-                import re
-                
                 try:
-                    model_dir = os.path.join(os.path.dirname(__file__), "models")
-                    mlb = joblib.load(os.path.join(model_dir, "mlb.pkl"))
-                    gbm_model = joblib.load(os.path.join(model_dir, "gbm_model.pkl"))
-                    feature_names = joblib.load(os.path.join(model_dir, "feature_names.pkl"))
-                    
-                    X_input = pd.DataFrame(0, index=[0], columns=feature_names)
+                    from core.SHAP_TreeExplainer import explain_cv
                     
                     skills = cv_data.get("skill", [])
-                    if skills:
-                        skills_encoded = mlb.transform([skills])[0]
-                        for idx, class_name in enumerate(mlb.classes_):
-                            if skills_encoded[idx] == 1:
-                                col1 = class_name
-                                col2 = class_name.replace(" ", "_").replace(".", "_")
-                                col3 = re.sub(r"\W+", "_", class_name.strip())
-                                
-                                if col1 in X_input.columns:
-                                    X_input.at[0, col1] = 1
-                                elif col2 in X_input.columns:
-                                    X_input.at[0, col2] = 1
-                                elif col3 in X_input.columns:
-                                    X_input.at[0, col3] = 1
-                    
-                    years = float(cv_data.get("năm kinh nghiệm", 0.0))
-                    if "years_experience" in X_input.columns:
-                        X_input.at[0, "years_experience"] = years
-                        
+                    years = float(cv_data.get("năm kinh nghiệm", 0))
                     level = cv_data.get("level công việc", "")
-                    if level == "Mid-Level" and "level_Middle" in X_input.columns:
-                        X_input.at[0, "level_Middle"] = 1
-                    elif level == "Junior" and "level_Junior" in X_input.columns:
-                        X_input.at[0, "level_Junior"] = 1
-                    elif level == "Senior" and "level_Senior" in X_input.columns:
-                        X_input.at[0, "level_Senior"] = 1
-                        
-                    pred_salary = gbm_model.predict(X_input)[0]
                     
+                    # Chuẩn bị dict đầu vào cho explain_cv (đồng bộ key)
+                    cv_input = {
+                        "skills": skills,
+                        "years_experience": years,
+                        "level": level,
+                        "job_title": "Developer",
+                        "location": "Hanoi",
+                    }
+                    
+                    result = explain_cv(cv_input, top_n_recommend=5)
+                    market = result["market_baseline"]
+                    valuation = result["user_cv_valuation"]
+                    
+                    pred_salary = valuation["predicted_salary"]
+                    percentile = valuation["market_percentile"]
+                    strengths = valuation["strengths_added_value"]
+                    weaknesses = valuation["weaknesses_deducted_value"]
+                    skills_supplement = valuation.get("skills_to_supplement", [])
+                    
+                    # ── SALARY HERO CARD ──
+                    perc_color = "#34d399" if percentile >= 50 else "#f59e0b"
                     st.markdown(
                         f'''
-                        <div style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-background-color)); border-radius: 16px; padding: 32px; color: var(--text-color); text-align: center; margin-bottom: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);">
-                            <h4 style="margin: 0 0 12px 0; font-weight: 500; letter-spacing: 1px;">MỨC LƯƠNG ĐỀ XUẤT (VNĐ)</h4>
-                            <h1 style="color: #34d399; margin: 0; font-size: 56px; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">{pred_salary:,.1f} Triệu</h1>
-                            <p style="margin: 16px 0 0 0; font-size: 14px; opacity: 0.8;">Dựa trên phân tích bằng AI LightGBM</p>
+                        <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 20px; padding: 36px; text-align: center; margin-bottom: 24px; box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.4);">
+                            <p style="margin: 0 0 8px 0; font-weight: 500; letter-spacing: 2px; color: #94a3b8; font-size: 13px;">MỨC LƯƠNG ĐỀ XUẤT</p>
+                            <h1 style="color: #34d399; margin: 0; font-size: 52px; font-weight: 800;">{pred_salary:,.1f} Triệu</h1>
+                            <p style="margin: 12px 0 0 0; font-size: 15px; color: {perc_color}; font-weight: 600;">📊 Bạn đang ở top {percentile:.0f}% so với thị trường</p>
+                            <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">Lương cơ sở thị trường: {market["base_salary"]:.1f} triệu · Phân tích bằng AI LightGBM + SHAP</p>
                         </div>
                         ''', 
                         unsafe_allow_html=True
                     )
                     
-                    info_col, skill_col = st.columns([1, 2])
+                    # ── THÔNG TIN ỨNG VIÊN + ĐIỂM MẠNH ──
+                    info_col, str_col = st.columns([1, 2])
                     with info_col:
                         with st.container(border=True):
-                            st.markdown("<h3 style='text-align: center;'>Thông tin ứng viên</h3>", unsafe_allow_html=True)
-                            st.metric(label="Kinh nghiệm", value=f"{years} năm")
+                            st.markdown("<h3 style='text-align: center;'>👤 Thông tin ứng viên</h3>", unsafe_allow_html=True)
+                            st.metric(label="Kinh nghiệm", value=f"{int(years)} năm")
                             st.metric(label="Cấp độ", value=level if level else "Chưa xác định")
+                            st.metric(label="Số kỹ năng", value=f"{len(skills)} skill")
                     
-                    with skill_col:
+                    with str_col:
                         with st.container(border=True):
-                            st.markdown("<h3 style='text-align: center;'>Kỹ năng phát hiện được</h3>", unsafe_allow_html=True)
-                            if skills:
-                                skills_html = "".join([f'<span style="display:inline-block; background:var(--secondary-background-color); color:var(--text-color); border:1px solid var(--primary-color); padding:6px 14px; border-radius:20px; margin:4px; font-size:14px; font-weight:500; transition: all 0.2s;">{s}</span>' for s in skills])
-                                st.markdown(f"<div style='margin-top: 10px;'>{skills_html}</div>", unsafe_allow_html=True)
+                            st.markdown("<h3 style='text-align: center;'>💪 Điểm mạnh giúp tăng lương</h3>", unsafe_allow_html=True)
+                            if strengths:
+                                for item in strengths:
+                                    impact = item["impact"]
+                                    st.markdown(
+                                        f'<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; margin:4px 0; background:rgba(52,211,153,0.1); border-radius:10px; border-left:3px solid #34d399;">'
+                                        f'<span style="font-weight:600;">{item["skill"]}</span>'
+                                        f'<span style="color:#34d399; font-weight:700;">+{impact:.2f} triệu</span>'
+                                        f'</div>', unsafe_allow_html=True
+                                    )
                             else:
-                                st.info("Không tìm thấy kỹ năng IT cụ thể.")
-                                
+                                st.caption("Chưa phát hiện điểm mạnh nổi bật.")
+                    
+                    # ── KỸ NĂNG CẦN BỔ SUNG ──
+                    if skills_supplement:
+                        with st.container(border=True):
+                            st.markdown("<h3 style='text-align: center;'>🚀 Kỹ năng nên bổ sung để tăng lương</h3>", unsafe_allow_html=True)
+                            for i, item in enumerate(skills_supplement):
+                                boost = item["salary_boost"]
+                                new_sal = item["new_salary"]
+                                bar_width = min(100, int(boost / max(s["salary_boost"] for s in skills_supplement) * 100))
+                                st.markdown(
+                                    f'<div style="display:flex; align-items:center; gap:12px; padding:10px 14px; margin:6px 0; background:var(--secondary-background-color); border-radius:12px;">'
+                                    f'<span style="min-width:130px; font-weight:600;">{item["skill"]}</span>'
+                                    f'<div style="flex:1; background:rgba(59,130,246,0.15); border-radius:6px; height:24px; overflow:hidden;">'
+                                    f'<div style="width:{bar_width}%; height:100%; background:linear-gradient(90deg, #3b82f6, #60a5fa); border-radius:6px; display:flex; align-items:center; justify-content:flex-end; padding-right:8px;">'
+                                    f'<span style="color:white; font-size:12px; font-weight:700;">+{boost:.2f}</span>'
+                                    f'</div></div>'
+                                    f'<span style="min-width:90px; text-align:right; color:#60a5fa; font-weight:600;">{new_sal:.1f} triệu</span>'
+                                    f'</div>', unsafe_allow_html=True
+                                )
+                    
+                    # ── NÚT PHÂN TÍCH LẠI ──
                     if st.button("Phân tích CV khác", width="stretch", type="primary"):
                         st.session_state["cv_done"] = False
                         st.session_state["cv_data"] = None
                         st.rerun()
                         
                 except Exception as e:
-                    st.error(f"Lỗi khi dự đoán: {e}")
+                    st.error(f"Lỗi khi phân tích: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+                    if st.button("Thử lại", width="stretch"):
+                        st.session_state["cv_done"] = False
+                        st.session_state["cv_data"] = None
+                        st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
 

@@ -432,30 +432,6 @@ def explain_cv(cv_dict: dict, top_n_recommend: int = 5, include_detail: bool = F
     return out
 
 
-def plot_waterfall(cv_dict: dict, max_display: int = 12):
-    """Ve bieu do SHAP waterfall cho 1 CV.
-
-    - Dung backend "Agg" (khong can cua so GUI) nen chay duoc ca khi debug.
-    - Truc waterfall di tu base_value (luong baseline), moi thanh la 1 feature
-      day luong len/xuong, cuoi cung cham toi predicted_salary.
-    - max_display: chi ve toi da bao nhieu feature quan trong nhat.
-    """
-    matplotlib.use("Agg")
-
-    x_cv = encode_cv(cv_dict)
-    shap_cv = _shap_2d(get_explainer(), x_cv)[0]
-    exp = shap.Explanation(
-        values=shap_cv,
-        base_values=get_base_value(),
-        data=x_cv.iloc[0].values,
-        feature_names=feature_names,
-    )
-    plt.figure()
-    shap.plots.waterfall(exp, max_display=max_display, show=False)
-    plt.tight_layout()
-    plt.show()
-
-
 if __name__ == "__main__":
     import sys
     if hasattr(sys.stdout, "reconfigure"):
