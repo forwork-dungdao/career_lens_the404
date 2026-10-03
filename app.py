@@ -31,6 +31,14 @@ def load_local_css():
         with open(css_path, "r", encoding="utf-8") as f:
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
+@st.cache_data
+def load_skill_percentages():
+    skill_csv_path = os.path.join(os.path.dirname(__file__), "data", "skill_listed.csv")
+    if os.path.exists(skill_csv_path):
+        return pd.read_csv(skill_csv_path)
+    from core.skill_listed import generate_skill_percentage_df
+    return generate_skill_percentage_df()
+
 def main():
     st.logo("🎯")
     
@@ -73,8 +81,7 @@ def main():
         )
 
     def dashboard():
-        st.title("📊 Dashboard")
-        st.write("Phân tích dữ liệu từ `job.csv`")
+        st.title("DASHBOARD")
 
         # Đọc dữ liệu thực tế
         data_path = os.path.join(os.path.dirname(__file__), "data", "job.csv")
@@ -83,47 +90,53 @@ def main():
         except Exception as e:
             st.error(f"Không thể đọc dữ liệu: {e}")
             return
-            
-        from itables.streamlit import interactive_table
 
         # Layout: 2/3 (Cột trái) - 1/3 (Cột phải)
         col_left, col_right = st.columns([2, 1])
 
         # ---------------------------------------------
-        # Cột Trái: Biểu đồ Cột (2/3 trang)
+        # Cột Trái: Biểu đồ Cột Ngang Kỹ năng (2/3 trang)
         # ---------------------------------------------
         with col_left:
             with st.container(border=True):
-                st.subheader("1. Top 10 Vị trí công việc phổ biến")
+                st.subheader("TOP NHỮNG KỸ NĂNG PHỔ BIẾN NHẤT")
                 
-                # Bộ lọc Drop box (Selectbox)
+                # Bộ lọc Drop box (Selectbox) sắp xếp
                 sort_bar = st.selectbox(
-                    "Sắp xếp số lượng:",
+                    "Sắp xếp theo tỷ lệ:",
                     ["Cao đến thấp", "Thấp đến cao"],
-                    key="sort_bar"
+                    key="sort_skill"
                 )
                 
-                # Xử lý dữ liệu bar
-                df_bar = df['job_title'].value_counts().reset_index().head(10)
-                df_bar.columns = ['Vị trí công việc', 'Số lượng']
+                # Đọc dữ liệu kỹ năng từ skill_listed
+                df_skill = load_skill_percentages()
+                df_top_skills = df_skill.head(10).copy()
+                
                 if sort_bar == "Thấp đến cao":
-                    df_bar = df_bar.sort_values(by='Số lượng', ascending=True)
+                    df_top_skills = df_top_skills.sort_values(by="Percentage (%)", ascending=True)
                 else:
-                    df_bar = df_bar.sort_values(by='Số lượng', ascending=False)
+                    df_top_skills = df_top_skills.sort_values(by="Percentage (%)", ascending=False)
                     
-                # Vẽ biểu đồ
+                # Vẽ biểu đồ cột ngang
                 fig_bar = px.bar(
-                    df_bar, 
-                    x='Vị trí công việc', 
-                    y='Số lượng', 
-                    color='Số lượng',
+                    df_top_skills, 
+                    x="Percentage (%)", 
+                    y="Skill", 
+                    orientation="h",
+                    color="Percentage (%)",
+                    color_continuous_scale="Blues",
+                    text=df_top_skills["Percentage (%)"].apply(lambda v: f"{v:.1f}%"),
                     height=500
                 )
+                fig_bar.update_layout(
+                    yaxis=dict(autorange="reversed"),
+                    xaxis_title="Tỷ lệ xuất hiện (%)",
+                    yaxis_title="Kỹ năng",
+                    margin=dict(t=20, b=20, l=10, r=20),
+                    coloraxis_showscale=False
+                )
+                fig_bar.update_traces(textposition="outside")
                 st.plotly_chart(fig_bar, width='stretch')
-                
-                # Hiển thị bảng
-                with st.expander("Hiển thị dữ liệu bảng"):
-                    interactive_table(df_bar, classes="display compact", maxBytes=0)
 
         # ---------------------------------------------
         # Cột Phải: Biểu đồ Donut & Heatmap (1/3 trang)
@@ -131,7 +144,7 @@ def main():
         with col_right:
             # Biểu đồ Donut
             with st.container(border=True):
-                st.subheader("2. Phân bố Cấp độ (Level)")
+                st.subheader("PHÂN BỐ CẤP ĐỘ")
                 
                 # Xử lý dữ liệu donut
                 df_donut = df['level'].value_counts().reset_index()
@@ -142,17 +155,14 @@ def main():
                     names='Cấp độ', 
                     values='Số lượng', 
                     hole=0.5,
-                    height=250
+                    height=240
                 )
                 fig_donut.update_layout(margin=dict(t=10, b=10, l=10, r=10))
                 st.plotly_chart(fig_donut, width='stretch')
-                
-                with st.expander("Dữ liệu bảng"):
-                    interactive_table(df_donut, classes="display compact", maxBytes=0)
             
             # Biểu đồ Heatmap
             with st.container(border=True):
-                st.subheader("3. Mức lương trung bình")
+                st.subheader("MỨC LƯƠNG TRUNG BÌNH")
                 
                 # Drop box lọc số lượng địa điểm
                 top_n_loc = st.selectbox("Số lượng địa điểm:", [3, 5, 7], index=1)
@@ -171,20 +181,17 @@ def main():
                 
                 fig_heat = px.imshow(
                     heatmap_data, 
-                    labels=dict(x="Địa điểm", y="Cấp độ", color="Lương (Tr)"),
+                    labels=dict(x="Địa điểm", y="Cấp độ", color="Lương (Triệu đồng)"),
                     aspect="auto",
-                    height=250
+                    height=220
                 )
                 fig_heat.update_layout(margin=dict(t=10, b=10, l=10, r=10))
                 st.plotly_chart(fig_heat, width='stretch')
-                
-                with st.expander("Dữ liệu bảng"):
-                    interactive_table(heatmap_data.reset_index(), classes="display compact", maxBytes=0)
 
 
 
     def salary_predictor():
-        st.title("📄 Salary Predictor")
+        st.title("SALARY PREDICTOR")
         result, upload = st.columns([7, 5])
         
         with upload:
