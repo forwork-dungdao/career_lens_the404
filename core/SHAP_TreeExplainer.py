@@ -11,20 +11,20 @@ import matplotlib
 import json
 
 def _find_root() -> Path:
-    """Tim thu muc goc cua project (thu muc chua `pickle/` va `data/`).
+    """Tim thu muc goc cua project (thu muc chua `models/` va `data/`).
 
     - Truong hop chuan: file nay nam o `core/SHAP_TreeExplainer.py`
       thi root la cha cua `core/`.
     - Truong hop file bi copy di cho khac: di nguoc len cac thu muc cha,
-      thu muc nao chua `pickle/` hoac ten la `career_lens_the404` thi lay.
+      thu muc nao chua `models/` hoac ten la `career_lens_the404` thi lay.
     """
     p = Path(__file__).resolve()
     # truong hop chuan: core/SHAP_TreeExplainer.py -> root la cha cua core/
     if p.parent.name == "core":
         return p.parent.parent
-    # file dang nam o root hoac cho khac: do len tim thu muc co pickle/
+    # file dang nam o root hoac cho khac: do len tim thu muc co models/
     for anc in [p.parent, *p.parents]:
-        if (anc / "pickle").exists():
+        if (anc / "models").exists():
             return anc
         if anc.name == "career_lens_the404":
             return anc
@@ -33,19 +33,13 @@ def _find_root() -> Path:
 
 # --- Duong dan dung chung cho ca file ---
 ROOT = _find_root()          # vd: .../career_lens_the404/career_lens_the404
-PICKLE_DIR = ROOT / "pickle"  # noi chua 3 file model/encoder
+PICKLE_DIR = ROOT / "models"  # noi chua 3 file model/encoder
 DATA_DIR = ROOT / "data"      # noi chua job.csv (du lieu thi truong)
-ROOT = _find_root()
-PICKLE_DIR = ROOT / "models"
-DATA_DIR = ROOT / "data"
 
 # Anh xa ten logic -> ten file thuc te tren dia.
-# Phai khop tuyet doi voi file trong thu muc pickle/,
+# Phai khop tuyet doi voi file trong thu muc models/,
 # neu sai 1 ky tu se roi vao FileNotFoundError o ham load_pickle.
 PICKLE_FILES = {
-    "gbm_model": "gbm_model._pkl",
-    "mlb": "mlb._pkl",
-    "feature_names": "feature_names._pkl",
     "gbm_model": "gbm_model.pkl",
     "mlb": "mlb.pkl",
     "feature_names": "feature_names.pkl",
@@ -55,13 +49,17 @@ PICKLE_FILES = {
 def load_pickle(stem: str):
     """Nap 1 artifact theo key trong PICKLE_FILES.
 
-    Vi du: load_pickle("gbm_model") -> doc file pickle/gbm_model._pkl.
+    Vi du: load_pickle("gbm_model") -> doc file models/gbm_model.pkl.
     Neu file khong ton tai thi bao ro ca duong dan + ROOT de de debug.
     """
     path = PICKLE_DIR / PICKLE_FILES[stem]
     if not path.exists():
         raise FileNotFoundError(f"Khong thay {path} | ROOT={ROOT}")
-    return joblib.load(path)
+    try:
+        return joblib.load(path)
+    except Exception as e:
+        print(f"Loi khi nap pickle tu {path}: {str(e)}")
+        raise
 
 
 def resolve_data() -> Path:
@@ -174,13 +172,24 @@ def encode_cv(cv_dict: dict) -> pd.DataFrame:
     # Dedup ten cot categorical theo sau cot skill (tranh trung cheo).
     cat_df.columns = _dedup_names(list(cat_df.columns), _SKILL_COLS)
 
-    # Cot so duy nhat.
-    num_df = pd.DataFrame([{"years_experience": cv_dict.get("years_experience", 0)}])
+    # Khởi tạo DataFrame toàn số 0 theo đúng số lượng và thứ tự cột lúc train
+    X_input = pd.DataFrame(0, index=[0], columns=feature_names)
 
-    X_one = pd.concat([skill_df, cat_df, num_df], axis=1)
-    # Phong khi concat van trung (vd cat trung skill): giu cot dau, bo cot lap
-    X_one = X_one.loc[:, ~X_one.columns.duplicated()]
-    return X_one.reindex(columns=feature_names, fill_value=0)
+    # Bơm dữ liệu skills (One-hot) vào đúng tọa độ
+    s_cols = [c for c in skill_df.columns if c in X_input.columns]
+    if s_cols:
+        X_input[s_cols] = skill_df[s_cols]
+
+    # Bơm dữ liệu categorical (Job title, Level, Location)
+    cat_cols = [c for c in cat_df.columns if c in X_input.columns]
+    if cat_cols:
+        X_input[cat_cols] = cat_df[cat_cols]
+
+    # Bơm dữ liệu dạng số (Years of Experience)
+    if "years_experience" in X_input.columns:
+        X_input.at[0, "years_experience"] = cv_dict.get("years_experience", 0)
+
+    return X_input
 
 
 # --- Cache dung chung: chi khoi tao explainer/base_value/market 1 lan ---
@@ -262,9 +271,21 @@ def get_market_context(n_sample: int = 1000):
     cat_all = pd.get_dummies(df[["job_title", "level", "location"]])
     cat_all.columns = _dedup_names(list(cat_all.columns), _SKILL_COLS)
     num_all = df[["years_experience"]]
-    X_all = pd.concat([s_df, cat_all, num_all], axis=1)
-    X_all = X_all.loc[:, ~X_all.columns.duplicated()]
-    X_all = X_all.reindex(columns=feature_names, fill_value=0)
+    
+    # Khởi tạo DataFrame toàn số 0 cho tập thị trường
+    X_all = pd.DataFrame(0, index=df.index, columns=feature_names)
+    
+    # Bơm dữ liệu theo từng block
+    s_cols = [c for c in s_df.columns if c in X_all.columns]
+    if s_cols:
+        X_all[s_cols] = s_df[s_cols]
+        
+    cat_cols = [c for c in cat_all.columns if c in X_all.columns]
+    if cat_cols:
+        X_all[cat_cols] = cat_all[cat_cols]
+        
+    if "years_experience" in X_all.columns:
+        X_all["years_experience"] = num_all["years_experience"]
 
     X_sample = X_all.sample(min(n_sample, len(X_all)), random_state=42)
     shap_sample = _shap_2d(get_explainer(), X_sample)
